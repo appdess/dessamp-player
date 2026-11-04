@@ -52,6 +52,8 @@ class FactoryDefaultsTests(unittest.TestCase):
         amps = json.loads(bank.read_text())["amplifiers"]
         self.assertEqual([a["cabinet"] for a in amps], ["SHFLD-Mix.wav", "Desfire.wav", "Green.wav", "Green.wav"])
         params = [a["parameters"] for a in amps]
+        self.assertAlmostEqual(2 + 6 * params[0][21] / 100, 6.1)  # FIRE Lead Gain
+        self.assertAlmostEqual(1 + 6 * params[0][25] / 100, 3.9)  # FIRE Presence
         self.assertEqual([(p[2], p[9]) for p in params], [(-85, 1)] * 4)
         self.assertEqual([p[11] for p in params], [0, 1, 1, 1])
         self.assertEqual([p[14] for p in params[1:]], [2, 3, 3])

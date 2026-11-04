@@ -35,11 +35,19 @@ def main():
         path, = bank.glob("*/Factory QA " + args.run + " " + cab + ".desspreset")
         model, ir, p = read_sound(path)
         assert (model, ir, p[11], p[14]) == (amp, wav, on, slot), (cab, model, ir, p[11], p[14])
+        if cab == "SHFLD Mix":
+            assert math.isclose(2 + p[21] * 6 / 100, 6.1, abs_tol=0.001), p[21]
+            assert math.isclose(1 + p[25] * 6 / 100, 3.9, abs_tol=0.001), p[25]
         if cab == "DZL":
             assert math.isclose(p[8], 7.8, abs_tol=0.00001), p[8]  # AU host parameter is float32.
         if cab == "Green":
             assert math.isclose(1 + p[21] * 9 / 100, 7, abs_tol=0.001) and p[29:] == (0, 0, 0, 7), p
         print(cab, model, "pedal", slot, "on" if on else "off", "tone", p[8], "Nocturne trim", p[32])
+    edited, = bank.glob("*/Factory QA " + args.run + " Verdant Edited.desspreset")
+    model, ir, p = read_sound(edited)
+    assert (model, ir, p[11], p[14]) == ("amp-02.dess", "Desfire.wav", 1, 2)
+    assert p[8] > 7.85, p[8]
+    print("Verdant touch edit:", p[8])
 
 
 if __name__ == "__main__":

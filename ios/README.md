@@ -37,6 +37,16 @@ RIG is shared by every amp. Input trim, calibration, gate, threshold and output
 stay in place across factory and named presets. The standalone remembers them
 between launches; each AUv3 instance restores its own RIG from its host.
 
+To play along with a backing track, plug headphones into the iRig, open the
+DessAmp standalone and confirm the guitar is audible. Then open your music app
+and start a song. DessAmp requests mixing without lowering the music volume
+or changing the USB route. Leave the music app in front if it does not support
+background playback. When using DessAmp as an AUv3, the host controls mixing.
+
+On November 4, 2026, the player confirmed hearing both the live guitar and
+YouTube Music through an iRig HD 2 on an iPhone 16 Pro using the standalone.
+This verifies that play-along setup; other interfaces and apps were not tested.
+
 Tap **TUNE** in the header and play one open string. The chromatic tuner shows
 the nearest note, octave and cents relative to A4 = 440 Hz. The marker moves
 left for flat and right for sharp; within three cents the note turns green.
@@ -72,7 +82,7 @@ xcodebuild test -project "$qa/PhoneCheck.xcodeproj" -scheme PhoneCheck \
 
 It exercises both swipe directions, the four cabinet slots, amp preset recall,
 and a global gate change across amp switches, a preset load and app relaunch.
-The factory rig test saves three uniquely named sounds in the simulator. Verify
+The factory rig test saves three factory sounds and a fourth with an edited Verdant Tone. Verify
 their actual amp, cabinet, pedal and level settings using the **Factory QA run**
 ID printed in the test log:
 

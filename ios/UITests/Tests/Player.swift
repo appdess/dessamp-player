@@ -35,12 +35,13 @@ final class Player: XCTestCase {
         let label = "QA Lead " + UUID().uuidString.prefix(5)
         tap(0.15,0.934)
         choose("Model Default")
-        XCTAssertTrue(try words().contains("5.0"))
+        try expectPageText("6.1")
+        let before = Set(try words())
         let start=app.coordinate(withNormalizedOffset:.init(dx:0.30,dy:0.479))
         start.press(forDuration:0.3,thenDragTo:app.coordinate(withNormalizedOffset:.init(dx:0.30,dy:0.429)))
         let edited=try words()
-        XCTAssertFalse(edited.contains("5.0"), "Gain did not change: " + edited.joined(separator:"|"))
-        let gain = try XCTUnwrap(edited.first { $0.range(of: #"^6\.\d$"#, options: .regularExpression) != nil }, edited.joined(separator:"|"))
+        XCTAssertFalse(edited.contains("6.1"), "Gain did not change: " + edited.joined(separator:"|"))
+        let gain = try XCTUnwrap(edited.first { !before.contains($0) && $0.range(of: #"^\d+\.\d$"#, options: .regularExpression) != nil }, edited.joined(separator:"|"))
         tap(0.80,0.872)
         let alert=app.alerts["Preset name"]
         XCTAssertTrue(alert.waitForExistence(timeout:5))
@@ -48,7 +49,7 @@ final class Player: XCTestCase {
         alert.textFields.firstMatch.typeText(String(label))
         alert.buttons["Save"].tap()
         choose("Model Default")
-        XCTAssertTrue(try words().contains("5.0"))
+        try expectPageText("6.1")
         choose(String(label))
         XCTAssertTrue(try words().contains(gain))
         tap(0.38,0.934)
@@ -62,7 +63,7 @@ final class Player: XCTestCase {
         choose("Model Default")
         tap(0.38,0.934)
         tap(0.15,0.934)
-        try expectPageText("5.0")
+        try expectPageText("6.1")
         try expectPageText("Model Default")
         app.terminate(); app.launch()
         choose(String(label))
@@ -70,7 +71,7 @@ final class Player: XCTestCase {
         XCUIDevice.shared.orientation = .landscapeLeft
         try expectPageText(gain)
         XCUIDevice.shared.orientation = .portrait
-        XCTAssertTrue(try words().contains(gain))
+        try expectPageText(gain)
         choose("Model Default")
         record("portrait")
         XCUIDevice.shared.orientation = .landscapeLeft
@@ -98,6 +99,14 @@ final class Player: XCTestCase {
         XCUIDevice.shared.orientation = .portrait
         app.launch()
         let run = String(UUID().uuidString.prefix(8))
+        func saveSnapshot(_ label: String) {
+            tap(0.92, 0.872) // NEW keeps each snapshot, including edits to a named sound.
+            let alert = app.alerts["Preset name"]
+            XCTAssertTrue(alert.waitForExistence(timeout: 5))
+            alert.textFields.firstMatch.tap()
+            alert.textFields.firstMatch.typeText("Factory QA " + run + " " + label)
+            alert.buttons["Save"].tap()
+        }
         for (x, cabinet): (CGFloat, String) in [(0.15, "SHFLD Mix"), (0.38, "DZL"), (0.62, "Green")] {
             tap(0.38, 0.14)
             tap(x, 0.934)
@@ -125,12 +134,13 @@ final class Player: XCTestCase {
             // Save the actual mobile control values. The host-side check also works
             // for controls whose small readouts screen OCR cannot reliably identify.
             tap(0.38, 0.14)
-            tap(0.80, 0.872)
-            let alert = app.alerts["Preset name"]
-            XCTAssertTrue(alert.waitForExistence(timeout: 5))
-            alert.textFields.firstMatch.tap()
-            alert.textFields.firstMatch.typeText("Factory QA " + run + " " + cabinet)
-            alert.buttons["Save"].tap()
+            saveSnapshot(cabinet)
+            if cabinet == "DZL" {
+                tap(0.15, 0.14)
+                let tone = app.coordinate(withNormalizedOffset: .init(dx: 0.34, dy: 0.60))
+                tone.press(forDuration: 0.3, thenDragTo: tone.withOffset(CGVector(dx: 0, dy: -43)))
+                saveSnapshot("Verdant Edited")
+            }
         }
         print("Factory QA run: " + run)
     }
@@ -255,7 +265,7 @@ final class Player: XCTestCase {
         tap(0.50, 0.55)
         try expectPageText("CAB ON")
         tap(0.38, 0.14)
-        try expectPageText("5.0")
+        try expectPageText("6.1")
     }
 
     func testUniversalRig() throws {

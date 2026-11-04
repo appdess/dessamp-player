@@ -32,6 +32,8 @@
 #define PLUG_FPS 60
 #define PLUG_SHARED_RESOURCES 0
 #ifdef OS_IOS
+  // Let the standalone amp play alongside a backing track from another app.
+  #define IPLUG_IOS_MIX_WITH_OTHERS 1
   // Required for device rotation and AUv3 host view-configuration changes.
   // The editor owns responsive geometry; the host supplies the viewport.
   #define PLUG_HOST_RESIZE 1

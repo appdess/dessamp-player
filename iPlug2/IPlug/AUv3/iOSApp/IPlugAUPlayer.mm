@@ -59,7 +59,17 @@
 #if PLUG_TYPE == 1
   [session setCategory: AVAudioSessionCategoryPlayback error:&error];
 #else
+#if defined(IPLUG_IOS_MIX_WITH_OTHERS) && IPLUG_IOS_MIX_WITH_OTHERS
+  NSError* mixingError = nil;
+  if (![session setCategory:AVAudioSessionCategoryPlayAndRecord
+                withOptions:AVAudioSessionCategoryOptionMixWithOthers error:&mixingError])
+  {
+    NSLog(@"Audio sharing unavailable: %@", mixingError.localizedDescription);
+    [session setCategory:AVAudioSessionCategoryPlayAndRecord error:&error];
+  }
+#else
   [session setCategory: AVAudioSessionCategoryPlayAndRecord error:&error];
+#endif
 #endif
   
   [session setPreferredSampleRate:iplug::DEFAULT_SAMPLE_RATE error:nil];

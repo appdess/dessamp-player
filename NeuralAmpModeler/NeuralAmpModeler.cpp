@@ -599,6 +599,17 @@ NeuralAmpModeler::NeuralAmpModeler(const InstanceInfo& info)
         std::error_code ec;
         driveBankAvailable = std::filesystem::is_regular_file(drives / (_GetBoostModelName(i) + ".nam"), ec);
       }
+      // A phone or DAW can open the editor before the first audio block. Read
+      // the bundled model once here so a supported Tone knob is editable then.
+      if (driveBankAvailable && !mVerdantHasTone.has_value())
+      {
+        try
+        {
+          const auto pedal = nam::get_dsp(drives / (_GetBoostModelName(kVerdantDriveIndex) + ".nam"));
+          mVerdantHasTone = pedal && pedal->NumGlobalParams() == 1;
+        }
+        catch (const std::exception&) { mVerdantHasTone = false; }
+      }
       const std::array<IBitmap, 4> pedals{{pGraphics->LoadBitmap(DESSAMP_OXIDE_FN), pGraphics->LoadBitmap(DESSAMP_AMBER_FN),
                                            pGraphics->LoadBitmap(DESSAMP_VERDANT_FN), pGraphics->LoadBitmap(DESSAMP_NOCTURNE_FN)}};
       auto* bank = pGraphics->AttachControl(new DessAmpPedalBank(layout.pedals, pedals, driveBankAvailable),
@@ -614,7 +625,7 @@ NeuralAmpModeler::NeuralAmpModeler(const InstanceInfo& info)
         knobFace, 52.f), kCtrlTagVerdantTone, "PRE_STAGE")->As<DessAmpKnobControl>();
       tone->SetPresentation("Tone", 0.0, 10.0, 5.0, "");
       tone->SetTooltip("Tone of the conditioned Verdant capture");
-      bank->SetHasTone(mVerdantHasTone);
+      bank->SetHasTone(mVerdantHasTone.value_or(false));
 
       auto* strip = pGraphics->AttachControl(new DessAmpFactoryStrip(layout.factoryStrip, mAmplifierSlotNames,
         [this](int index) {
@@ -1402,7 +1413,7 @@ void NeuralAmpModeler::OnIdle()
     }
     if (auto* ui = GetUI())
       if (auto* bank = ui->GetControlWithTag(kCtrlTagPlayerPreStage))
-        bank->As<DessAmpPedalBank>()->SetHasTone(mVerdantHasTone);
+        bank->As<DessAmpPedalBank>()->SetHasTone(mVerdantHasTone.value_or(false));
     if (!preparedPath.empty())
     {
       _SetBoostNAMPath(preparedPath.c_str());

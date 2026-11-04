@@ -638,7 +638,7 @@ private:
   std::atomic<int> mAmpModelIdx{0};
   std::atomic<bool> mPlayerModeTarget{false};
   std::atomic<bool> mAmpActiveTarget{true};
-  bool mVerdantHasTone = false; // UI thread, discovered from the loaded NAM.
+  std::optional<bool> mVerdantHasTone; // UI thread; fixed-setting captures have no Tone control.
   std::atomic<int> mBoostModelIdx{0};
   std::atomic<bool> mBoostActiveTarget{false};
   std::atomic<bool> mIRActiveTarget{true};

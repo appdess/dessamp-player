@@ -21,7 +21,8 @@ post-drive gain, including existing host automation. The selected pedal's own
 level adds to that gain before the amplifier.
 
 Verdant Tone (ID 8) drives the physical tone axis when the private drive bank
-contains the conditioned TS9 capture. A fixed-setting TS9 has no tone axis.
+contains the conditioned TS9 capture. The knob is editable even before audio
+starts. A fixed-setting TS9 has no tone axis.
 The private listening build uses the one-axis capture with SHA-256
 `d7021b1bbbcce0cc4f6438c89fbf20d86f18138d7dacf64e70670da06043aa8f`
 in its gated `DESSAMP_PRIVATE_DRIVE_DIR` on Mac and iOS.
