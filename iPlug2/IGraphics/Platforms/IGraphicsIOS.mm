@@ -23,12 +23,6 @@
 
 #pragma clang diagnostic ignored "-Wdeprecated-declarations"
 
-// The standalone's responder chain reaches its UIApplication. Hosts of an
-// extension keep control of external navigation.
-@protocol IPlugURLOpener
-- (void)openURL:(NSURL*)url options:(NSDictionary*)options completionHandler:(void (^)(BOOL))handler;
-@end
-
 BEGIN_IPLUG_NAMESPACE
 BEGIN_IGRAPHICS_NAMESPACE
 
@@ -289,22 +283,19 @@ bool IGraphicsIOS::OpenURL(const char* url, const char* msgWindowTitle, const ch
                         ? [NSURL URLWithString:value] : [NSURL fileURLWithPath:value];
   if (!destination || [[NSBundle mainBundle] objectForInfoDictionaryKey:@"NSExtension"]) return false;
   UIView* view = (UIView*)mView;
-  for (UIResponder* responder = view; responder; responder = responder.nextResponder)
-  {
-    if (![responder respondsToSelector:@selector(openURL:options:completionHandler:)]) continue;
-    [(id<IPlugURLOpener>)responder openURL:destination options:@{} completionHandler:^(BOOL opened) {
-      if (opened || !view.window) return;
-      UIAlertController* alert = [UIAlertController alertControllerWithTitle:@"Could not open link"
-        message:value preferredStyle:UIAlertControllerStyleAlert];
-      [alert addAction:[UIAlertAction actionWithTitle:@"Copy" style:UIAlertActionStyleDefault handler:^(UIAlertAction* action) {
-        [UIPasteboard generalPasteboard].string = value;
-      }]];
-      [alert addAction:[UIAlertAction actionWithTitle:@"Close" style:UIAlertActionStyleCancel handler:nil]];
-      [view.window.rootViewController presentViewController:alert animated:YES completion:nil];
-    }];
-    return true;
-  }
-  return false;
+  UIWindowScene* scene = view.window.windowScene;
+  if (!scene) return false;
+  [scene openURL:destination options:nil completionHandler:^(BOOL opened) {
+    if (opened || !view.window) return;
+    UIAlertController* alert = [UIAlertController alertControllerWithTitle:@"Could not open link"
+      message:value preferredStyle:UIAlertControllerStyleAlert];
+    [alert addAction:[UIAlertAction actionWithTitle:@"Copy" style:UIAlertActionStyleDefault handler:^(UIAlertAction* action) {
+      [UIPasteboard generalPasteboard].string = value;
+    }]];
+    [alert addAction:[UIAlertAction actionWithTitle:@"Close" style:UIAlertActionStyleCancel handler:nil]];
+    [view.window.rootViewController presentViewController:alert animated:YES completion:nil];
+  }];
+  return true;
 }
 
 void* IGraphicsIOS::GetWindow()

@@ -221,5 +221,12 @@ final class Player: XCTestCase {
         try expectPageText("EMAIL")
         tap(0.19, 0.55)
         try expectPageText("SETTINGS")
+        tap(0.62, 0.255)
+        try expectPageText("REPORT ISSUE")
+        tap(0.81, 0.55)
+        let safari = XCUIApplication(bundleIdentifier: "com.apple.mobilesafari")
+        XCTAssertTrue(safari.wait(for: .runningForeground, timeout: 12))
+        app.activate()
+        try expectPageText("SETTINGS")
     }
 }
