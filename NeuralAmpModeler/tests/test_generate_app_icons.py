@@ -9,9 +9,11 @@ SPEC = importlib.util.spec_from_file_location("dessamp_generate_app_icons", SCRI
 MODULE = importlib.util.module_from_spec(SPEC)
 assert SPEC.loader is not None
 SPEC.loader.exec_module(MODULE)
+SOURCE_ONLY = (SCRIPT.parents[2] / "SOURCE-INVENTORY.sha256").is_file()
 
 
 class GenerateAppIconsTests(unittest.TestCase):
+    @unittest.skipIf(SOURCE_ONLY and not MODULE.DEFAULT_MASTER.exists(), "Icon master excluded from public source")
     def test_checked_in_catalogue_matches_hash_bound_master(self):
         result = MODULE.build_icon_catalogue(check=True)
 
@@ -22,11 +24,12 @@ class GenerateAppIconsTests(unittest.TestCase):
     def test_master_hash_prevents_unreviewed_replacement(self):
         with tempfile.TemporaryDirectory() as temporary:
             altered = pathlib.Path(temporary) / "altered.png"
-            altered.write_bytes(MODULE.DEFAULT_MASTER.read_bytes() + b"changed")
+            altered.write_bytes(b"not the approved master")
 
             with self.assertRaisesRegex(RuntimeError, "master hash"):
                 MODULE.verify_master(altered)
 
+    @unittest.skipIf(SOURCE_ONLY and not MODULE.DEFAULT_ASSET_DIR.exists(), "Icon catalogue excluded from public source")
     def test_catalogue_metadata_references_exact_target_set(self):
         MODULE.validate_catalog()
 

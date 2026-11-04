@@ -53,7 +53,7 @@ also works without Codex.
 - portable `.dess` package loading
 - amplifier-scoped `.desspreset` libraries, Save/Save As New, and Model Default recall
 - four Version C factory cabinets, cabinet bypass, and custom mono WAV IR loading
-- interface input-headroom adjustment and practical Auto Input level matching
+- [input calibration and five-second level matching](docs/input-calibration.md), with a one-tap reset
 - conditioned WaveNet inference and the conditioned A2 Full runtime path
 - session recall and amplifier-scoped preset navigation
 - PRE pedal bank, AMP head, and CAB impulse-response views
@@ -68,10 +68,26 @@ On the AMP screen, change the controls and tap **SAVE**. From **Model Default**,
 DessAmp asks for a name and stores your sound in the current amp’s bank. Use
 the preset picker to recall it or return to **Model Default**. Once a user
 preset is selected, **SAVE** updates it; **NEW** saves a separate sound. The
-preset captures the amp, pedal, cabinet and signal settings together. Switching away from an edited sound offers Save, Discard and Keep Editing. Cabinet
+preset captures the amp, pedal and cabinet together. Switching away from an
+edited sound offers Save, Discard and Keep Editing. Cabinet
 WAVs and custom amp packages must remain available.
 
-FIRE, FORGE, REDLINE and imported amps keep their own banks. On Mac the
+FIRE, FORGE, REDLINE and imported amps keep their own banks. Switching back to
+an amp in the same player instance recalls the last preset you saved or loaded
+for it, including its pedal and cabinet settings. Choose **Model Default** to
+return to the factory sound on future switches. FIRE defaults to **SHFLD Mix**,
+FORGE to **DZL**, and both REDLINE variants to **Green**. FIRE starts with its drive off,
+FORGE with **Verdant 09** on (Tone **7.8**), and both REDLINE variants with
+**Nocturne** on at **+7 dB** and amp Gain **7.0**.
+
+**RIG** is shared across all amps in the player. Input trim, calibration,
+gate on/off, threshold and output settings stay where you set them when you
+change amp, select Model Default, or recall a named preset. On first use the
+gate is on at **−85 dB**. It listens after the drive and attenuates the amp
+output before the cabinet. The standalone remembers RIG when you reopen it.
+Each plug-in instance keeps its own RIG in the host project.
+
+On Mac the
 standalone and plug-ins use the same local preset folder. The iOS standalone
 and AUv3 have separate sandbox libraries. A DAW project can still restore the
 plug-in state without creating a named preset.

@@ -17,7 +17,7 @@ sys.path.insert(0, scriptpath)
 
 from parse_config import parse_config
 from dessamp_release_licenses import LICENSE_BUNDLE_ENTRIES
-from dessamp_factory_defaults import CABINET_HASHES
+from dessamp_factory_defaults import CABINET_HASHES, profile_matches_bank
 
 
 def write_text_if_changed(path, value):
@@ -152,7 +152,7 @@ def prepare_private_listening(root, ledger, expected_digest, build):
         if source.startswith("IRs/") and entries[source]["sha256"] != CABINET_HASHES[path.name]:
             raise ValueError(f"Version C cabinet hash mismatch: {source}")
         checked[source] = data
-    if json.loads(checked["Defaults/FactoryDefaults.json"]).get("ir_sha256") != CABINET_HASHES["Desfire.wav"]:
+    if not profile_matches_bank(json.loads(checked["Defaults/FactoryDefaults.json"])):
         raise ValueError("Factory profile does not match the Version C bank")
     write_installer_files(build, "listening-", checked, destinations, include)
 

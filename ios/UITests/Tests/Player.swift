@@ -57,6 +57,13 @@ final class Player: XCTestCase {
         XCTAssertFalse(app.tables.staticTexts[String(label)].exists, "FIRE preset leaked into FORGE")
         app.tables.staticTexts["Model Default"].tap()
         tap(0.15,0.934)
+        try expectPageText(String(label))
+        try expectPageText(gain)
+        choose("Model Default")
+        tap(0.38,0.934)
+        tap(0.15,0.934)
+        try expectPageText("5.0")
+        try expectPageText("Model Default")
         app.terminate(); app.launch()
         choose(String(label))
         XCTAssertTrue(try words().contains(gain))
@@ -87,6 +94,47 @@ final class Player: XCTestCase {
         } while Date() < deadline
         XCTFail("Missing " + label + " in " + page)
     }
+    func testModelDefaultRigs() throws {
+        XCUIDevice.shared.orientation = .portrait
+        app.launch()
+        let run = String(UUID().uuidString.prefix(8))
+        for (x, cabinet): (CGFloat, String) in [(0.15, "SHFLD Mix"), (0.38, "DZL"), (0.62, "Green")] {
+            tap(0.38, 0.14)
+            tap(x, 0.934)
+            func expectCabinet() throws {
+                tap(0.62, 0.14)
+                try expectPageText("CAB ON")
+                let name = try words(heroOnly: true).joined(separator: " ").lowercased()
+                XCTAssertTrue(name.contains(cabinet.lowercased()), "Expected " + cabinet + ", got " + name)
+            }
+            try expectCabinet() // Switching to an amp without a named preset.
+            choose("Model Default")
+            try expectCabinet() // Explicitly recalling the same default.
+            tap(0.85, 0.14)
+            try expectPageText("Threshold")
+            try expectPageText("85 dB")
+            if cabinet == "DZL" {
+                tap(0.15, 0.14)
+                record("forge-pedal-default")
+            } else if cabinet == "Green" {
+                tap(0.38, 0.14)
+                try expectPageText("7.0") // REDLINE US gain.
+                tap(0.15, 0.14)
+                try expectPageText("7.0 dB") // Nocturne's own Level.
+            }
+            // Save the actual mobile control values. The host-side check also works
+            // for controls whose small readouts screen OCR cannot reliably identify.
+            tap(0.38, 0.14)
+            tap(0.80, 0.872)
+            let alert = app.alerts["Preset name"]
+            XCTAssertTrue(alert.waitForExistence(timeout: 5))
+            alert.textFields.firstMatch.tap()
+            alert.textFields.firstMatch.typeText("Factory QA " + run + " " + cabinet)
+            alert.buttons["Save"].tap()
+        }
+        print("Factory QA run: " + run)
+    }
+
     func testSwipeAndCabinetShelf() throws {
         XCUIDevice.shared.orientation = .portrait
         app.launch()
@@ -181,7 +229,7 @@ final class Player: XCTestCase {
         alert.textFields.firstMatch.typeText(String(name))
         alert.buttons["Save"].tap()
         tap(0.15, 0.934)
-        choose(String(name))
+        try expectPageText(String(name))
         tap(0.62, 0.14)
         XCTAssertTrue(try words(heroOnly:true).joined().lowercased().contains("green"))
 
@@ -195,7 +243,7 @@ final class Player: XCTestCase {
         try expectPageText("Save this sound")
         tap(0.81, 0.55) // Named preset saves directly and completes the switch.
         tap(0.15, 0.934)
-        choose(String(name))
+        try expectPageText(String(name))
         try expectPageText(savedGain)
 
         // Cabinet bypass by itself is a change worth protecting.
@@ -208,6 +256,74 @@ final class Player: XCTestCase {
         try expectPageText("CAB ON")
         tap(0.38, 0.14)
         try expectPageText("5.0")
+    }
+
+    func testUniversalRig() throws {
+        XCUIDevice.shared.orientation = .portrait
+        app.launch()
+        tap(0.38, 0.14)
+        tap(0.15, 0.934)
+        choose("Model Default")
+        let name = "Global QA " + UUID().uuidString.prefix(4)
+        tap(0.80, 0.872)
+        let alert = app.alerts["Preset name"]
+        XCTAssertTrue(alert.waitForExistence(timeout: 5))
+        alert.textFields.firstMatch.tap()
+        alert.textFields.firstMatch.typeText(String(name))
+        alert.buttons["Save"].tap()
+        tap(0.85, 0.14)
+        try expectPageText("SHARED BY ALL AMPS")
+        let request = VNRecognizeTextRequest()
+        try VNImageRequestHandler(data: XCUIScreen.main.screenshot().pngRepresentation).perform([request])
+        let box = try XCTUnwrap(request.results?.first { $0.topCandidates(1).first?.string == "Threshold" }).boundingBox
+        let knob = app.coordinate(withNormalizedOffset: .init(dx: box.midX, dy: 1 - box.midY + 0.038))
+        try expectPageText("85 dB")
+        knob.press(forDuration: 0.3, thenDragTo: knob.withOffset(CGVector(dx: 0, dy: -45)))
+        let threshold = try XCTUnwrap(try words().first { $0.range(of: #"[-−]\d{1,2} dB"#, options: .regularExpression) != nil })
+        XCTAssertFalse(threshold.contains("85"), threshold)
+        tap(0.38, 0.14)
+        tap(0.38, 0.934) // A global change should never prompt to save this amp.
+        try expectPageText("FORGE")
+        tap(0.15, 0.934)
+        try expectPageText(String(name))
+        choose("Model Default")
+        choose(String(name))
+        tap(0.85, 0.14)
+        try expectPageText(threshold)
+        app.terminate(); app.launch()
+        tap(0.85, 0.14)
+        try expectPageText(threshold)
+        knob.press(forDuration: 0.3, thenDragTo: knob.withOffset(CGVector(dx: 0, dy: 45)))
+        try expectPageText("85 dB")
+    }
+
+    func testInputMatchAndReset() throws {
+        XCUIDevice.shared.orientation = .portrait
+        app.launch()
+        tap(0.82, 0.09)
+        try expectPageText("SETTINGS")
+        func pressLabel(_ label: String) throws {
+            let request = VNRecognizeTextRequest()
+            request.usesLanguageCorrection = false
+            try VNImageRequestHandler(data: XCUIScreen.main.screenshot().pngRepresentation).perform([request])
+            let results = request.results ?? []
+            let button = try XCTUnwrap(results.first { $0.topCandidates(1).first?.string.uppercased() == label }
+                ?? results.first { $0.topCandidates(1).first?.string.localizedCaseInsensitiveContains(label) == true }, label)
+            tap(button.boundingBox.midX, 1 - button.boundingBox.midY)
+        }
+        try pressLabel("M2 XLR")
+        try expectPageText("CALIBRATION ON")
+        try pressLabel("RESET INPUT")
+        XCTAssertTrue(try words().contains("CALIBRATION OFF"))
+        try expectPageText("+10.0 dBu")
+        try expectPageText("Input trim +0.0 dB")
+        let hasAudio = !(try words().joined().lowercased().contains("waiting for active amp"))
+        try pressLabel("MATCH INPUT")
+        try expectPageText(hasAudio ? "CANCEL MATCH" : "Enable an amp and audio processing first")
+        try pressLabel("RESET INPUT")
+        XCTAssertTrue(try words().contains("CALIBRATION OFF"))
+        try expectPageText("Reset. Interface level kept.")
+        record("input-settings-reset")
     }
 
     func testFeedbackEntry() throws {

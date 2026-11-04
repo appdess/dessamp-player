@@ -11,7 +11,7 @@ namespace dessamp {
 class AutoInputMatch
 {
 public:
-  enum class State { Idle, Requested, Measuring, Complete, Cancelled };
+  enum class State { Idle, Requested, Measuring, Complete, Cancelled, Interrupted };
   bool Start()
   {
     auto state = mState.load(std::memory_order_acquire);
@@ -40,7 +40,12 @@ public:
       if (!mState.compare_exchange_strong(state, State::Measuring, std::memory_order_acq_rel)) return;
     }
     else if (state != State::Measuring) return;
-    if (rate != mRate) { Cancel(); return; }
+    if (rate != mRate)
+    {
+      auto measuring = State::Measuring;
+      mState.compare_exchange_strong(measuring, State::Interrupted, std::memory_order_release);
+      return;
+    }
     for (int s = 0; s < frames && mCount < mTotal; ++s, ++mCount)
     {
       double mono = 0;

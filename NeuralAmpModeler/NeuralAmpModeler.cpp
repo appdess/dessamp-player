@@ -2,6 +2,7 @@
 #include <cctype>
 #include <cmath> // pow
 #include <filesystem>
+#include <fstream>
 #include <iostream>
 #include <limits>
 #include <set>
@@ -25,6 +26,9 @@
 #include "NeuralAmpModelerControls.h"
 #include "PlayerMorphPresentation.h"
 #include "PlayerShellIdentity.h"
+#ifdef OS_IOS
+#include <CoreFoundation/CoreFoundation.h>
+#endif
 
 namespace
 {
@@ -234,7 +238,7 @@ NeuralAmpModeler::NeuralAmpModeler(const InstanceInfo& info)
   GetParam(kVerdantLevel)->InitGain("Verdant Level", 0.0, -20.0, 20.0, 0.1);
   GetParam(kNocturneLevel)->InitGain("Nocturne Level", 0.0, -20.0, 20.0, 0.1);
   GetParam(kBoostTone)->InitDouble("Boost Tone", 5.0, 0.0, 10.0, 0.1);
-  GetParam(kNoiseGateThreshold)->InitGain("Threshold", -80.0, -100.0, 0.0, 0.1);
+  GetParam(kNoiseGateThreshold)->InitGain("Threshold", -85.0, -100.0, 0.0, 0.1);
   GetParam(kNoiseGateActive)->InitBool("NoiseGateActive", true);
   GetParam(kEQActive)->InitBool("ToneStack", false);
   // Raw is the universally safe default. Model-aware options are enabled only
@@ -284,6 +288,7 @@ NeuralAmpModeler::NeuralAmpModeler(const InstanceInfo& info)
   AppSupportPath(appSupportPath, false);
   mDessPresetRootDirectory =
     std::filesystem::u8path(appSupportPath.Get()) / BUNDLE_NAME / "Presets";
+  if (appSupportPath.GetLength()) _LoadStandaloneRig();
   mBundledAmplifierPaths = GetBundledAmplifierPaths(GetBundleID());
   mBundledAmplifierProductFamilies.resize(mBundledAmplifierPaths.size());
   mBundledAmplifierProductVariants.resize(mBundledAmplifierPaths.size());
@@ -426,7 +431,7 @@ NeuralAmpModeler::NeuralAmpModeler(const InstanceInfo& info)
                                                                      kNoiseGateThreshold, "Threshold", knobFace, 48.f),
                                               kCtrlTagPlayerGateKnob, "GATE_CONTROLS")
                               ->As<DessAmpKnobControl>();
-      gateThreshold->SetPresentation("Threshold", -100.0, 0.0, -80.0, "dB");
+      gateThreshold->SetPresentation("Threshold", -100.0, 0.0, GetParam(kNoiseGateThreshold)->GetDefault(), "dB");
       auto* gateToggle = pGraphics->AttachControl(
         new DessAmpToggleControl(layout.gateToggle, kNoiseGateActive, "Gate"), kCtrlTagPlayerGateToggle);
       gateToggle->SetTooltip("Enable or bypass the noise gate");
@@ -437,7 +442,7 @@ NeuralAmpModeler::NeuralAmpModeler(const InstanceInfo& info)
       const auto bundledIRs = GetBundledIRChoices(GetBundleID());
       if (GetParam(kIRToggle)->Bool() && _GetIRPathSnapshot().GetLength() == 0 && !bundledIRs.empty())
       {
-        const std::string defaultIRPath = GetBundledDefaultIRPath(GetBundleID());
+        const std::string defaultIRPath = _DefaultCabinetForAmp(std::filesystem::u8path(_GetPlayerManifestPathSnapshot().Get()));
         if (!defaultIRPath.empty())
           _SetIRPathAndRequest(defaultIRPath.c_str());
       }
@@ -628,7 +633,8 @@ NeuralAmpModeler::NeuralAmpModeler(const InstanceInfo& info)
         kCtrlTagPlayerFooterStatus, "PLAYER_FOOTER");
       footerStatus->SetTooltip("Player status");
       auto* settingsPanel = pGraphics->AttachControl(
-        new DessAmpSettingsPanelControl(bounds, [this]() { _ToggleAutoInputMatch(); }, [this]() { _ShowFeedback(); }), kCtrlTagSettingsBox);
+        new DessAmpSettingsPanelControl(bounds, [this]() { _ToggleAutoInputMatch(); }, [this]() { _ResetInput(); },
+                                        [this]() { _ShowFeedback(); }), kCtrlTagSettingsBox);
       settingsPanel->Hide(true);
       pGraphics->AttachControl(new DessAmpTunerPanel(bounds, [this](IControl*) { _ShowTuner(false); }),
         kCtrlTagTunerPanel)->Hide(true);
@@ -1210,7 +1216,7 @@ void NeuralAmpModeler::_ServiceDSPRequests()
 
     if (requestedIRPath.GetLength() == 0)
     {
-      const std::string defaultIRPath = GetBundledDefaultIRPath(GetBundleID());
+      const std::string defaultIRPath = _DefaultCabinetForAmp(std::filesystem::u8path(_GetPlayerManifestPathSnapshot().Get()));
       if (!defaultIRPath.empty())
       {
         std::lock_guard<std::mutex> lock(mPathMutex);
@@ -1260,6 +1266,7 @@ void NeuralAmpModeler::OnRestoreState()
 
 void NeuralAmpModeler::OnIdle()
 {
+  _SaveStandaloneRig();
   if (auto* ui = GetUI())
     if (auto* panel = ui->GetControlWithTag(kCtrlTagTunerPanel); panel && !panel->IsHidden())
       panel->As<DessAmpTunerPanel>()->Update(mTuner);
@@ -1352,7 +1359,6 @@ void NeuralAmpModeler::OnIdle()
     _UpdateLatency();
     _SetInputGain();
     _SetOutputGain();
-    _ValidateOutputModeForCurrentModel();
     if (mPlayerModeTarget.load(std::memory_order_acquire))
       _SyncDessPresetScopeToCurrentAmplifier();
     if (GetUI())
@@ -1366,8 +1372,6 @@ void NeuralAmpModeler::OnIdle()
           kCtrlTagPlayerManifest, kMsgTagLoadedPlayerManifest, manifestPath.GetLength(), manifestPath.Get());
     }
   }
-  if (mOutputModeValidationPending.exchange(false, std::memory_order_acq_rel))
-    _ValidateOutputModeForCurrentModel();
   if (mNewIRLoadedInDSP.exchange(false, std::memory_order_acq_rel))
   {
     const WDL_String loadedPath = _GetIRPathSnapshot();
@@ -1425,6 +1429,11 @@ void NeuralAmpModeler::OnIdle()
 
 bool NeuralAmpModeler::SerializeState(IByteChunk& chunk) const
 {
+  return _SerializePlayerState(chunk, false);
+}
+
+bool NeuralAmpModeler::_SerializePlayerState(IByteChunk& chunk, bool ampPreset) const
+{
   // If this isn't here when unserializing, then we know we're dealing with something before v0.8.0.
   WDL_String header("###NeuralAmpModeler###"); // Don't change this!
   chunk.PutStr(header.Get());
@@ -1437,10 +1446,24 @@ bool NeuralAmpModeler::SerializeState(IByteChunk& chunk) const
   const WDL_String irPath = _GetIRPathSnapshot();
   chunk.PutStr(namPath.Get());
   chunk.PutStr(irPath.Get()); // Still serialize IR path
-  return SerializeParams(chunk); // This serializes gain parameter
+  if (!ampPreset) return SerializeParams(chunk);
+  // Keep the version 1 preset envelope readable by older players, without
+  // including this player's input chain in a sound shared with someone else.
+  for (int i = 0; i < kNumParams; ++i)
+  {
+    const auto* param = GetParam(i);
+    const double value = _IsRigParam(i) ? param->GetDefault() : param->Value();
+    if (chunk.Put(&value) <= 0) return false;
+  }
+  return true;
 }
 
 int NeuralAmpModeler::UnserializeState(const IByteChunk& chunk, int startPos)
+{
+  return _ReadPlayerState(chunk, startPos, false);
+}
+
+int NeuralAmpModeler::_ReadPlayerState(const IByteChunk& chunk, int startPos, bool ampPreset)
 {
   try
   {
@@ -1452,8 +1475,8 @@ int NeuralAmpModeler::UnserializeState(const IByteChunk& chunk, int startPos)
 
     const char* kExpectedHeader = "###NeuralAmpModeler###";
     if (strcmp(header.Get(), kExpectedHeader) == 0)
-      return _UnserializeStateWithKnownVersion(chunk, pos);
-    return _UnserializeStateWithUnknownVersion(chunk, startPos);
+      return _UnserializeStateWithKnownVersion(chunk, pos, ampPreset);
+    return _UnserializeStateWithUnknownVersion(chunk, startPos, ampPreset);
   }
   catch (const std::exception& e)
   {
@@ -1646,7 +1669,7 @@ void NeuralAmpModeler::_SaveDessPreset(const char* path, bool createNew)
   }
 
   IByteChunk state;
-  if (!SerializeState(state) || state.Size() < 0)
+  if (!_SerializePlayerState(state, true) || state.Size() < 0)
   {
     if (auto* ui = GetUI())
       _ShowMessageBox(ui, "The current amplifier state could not be serialized.", "Preset was not saved", kMB_OK);
@@ -1663,14 +1686,11 @@ void NeuralAmpModeler::_SaveDessPreset(const char* path, bool createNew)
     return;
   }
 
-  mDessPresetPath = savedPath.lexically_normal();
-  mDessPresetLabel = dessamp::preset::Label(mDessPresetPath);
-  mDessPresetModified = false;
-  _UpdateDessPresetUI();
+  _SelectNamedPreset(savedPath);
   if (mPendingRigChange) _FinishRigChange(true);
 }
 
-bool NeuralAmpModeler::_RecallDessPreset(const std::filesystem::path& path, std::string& error)
+bool NeuralAmpModeler::_RecallDessPreset(const std::filesystem::path& path, std::string& error, bool allowRelink)
 {
   error.clear();
   auto decoded = dessamp::preset::Read(path);
@@ -1680,7 +1700,6 @@ bool NeuralAmpModeler::_RecallDessPreset(const std::filesystem::path& path, std:
     return false;
   }
 
-  _SyncDessPresetScopeToCurrentAmplifier();
   // iOS may assign a different bundle/container UUID on update; the Mac
   // standalone and AU also have separate factory-resource paths. Rebind only
   // recognized resources in our own per-amp bank. Leave external user IRs alone.
@@ -1742,7 +1761,7 @@ bool NeuralAmpModeler::_RecallDessPreset(const std::filesystem::path& path, std:
     // selected from elsewhere must never be allowed to cross that boundary.
     const auto selectedDirectory = path.parent_path().lexically_normal();
     const auto activeDirectory = mDessPresetDirectory.lexically_normal();
-    if (scopeError == "Preset amplifier package is unavailable or invalid"
+    if (allowRelink && scopeError == "Preset amplifier package is unavailable or invalid"
         && !activeDirectory.empty() && selectedDirectory == activeDirectory)
       storedAmplifierId = mDessPresetAmplifierId;
     else
@@ -1767,10 +1786,10 @@ bool NeuralAmpModeler::_RecallDessPreset(const std::filesystem::path& path, std:
   IByteChunk incoming;
   if (!decoded.state.empty())
     incoming.PutBytes(decoded.state.data(), static_cast<int>(decoded.state.size()));
-  const int end = UnserializeState(incoming, 0);
+  const int end = _ReadPlayerState(incoming, 0, true);
   if (end != incoming.Size())
   {
-    const int rollbackEnd = UnserializeState(snapshot, 0);
+    const int rollbackEnd = _ReadPlayerState(snapshot, 0, true);
     error = "Preset state is invalid or was not consumed completely";
     if (rollbackEnd != snapshot.Size())
       error += "; the previous state could not be restored completely";
@@ -1781,7 +1800,31 @@ bool NeuralAmpModeler::_RecallDessPreset(const std::filesystem::path& path, std:
   OnRestoreState();
   _UpdatePlayerModeUI();
   _UpdatePlayerControls();
+  _SelectNamedPreset(path);
   return true;
+}
+
+void NeuralAmpModeler::_SelectNamedPreset(const std::filesystem::path& path)
+{
+  mDessPresetPath = path.lexically_normal();
+  mLastPresetByAmp[mDessPresetAmplifierId] = mDessPresetPath;
+  mDessPresetLabel = dessamp::preset::Label(mDessPresetPath);
+  mDessPresetModified = false;
+  _UpdateDessPresetUI();
+}
+
+bool NeuralAmpModeler::_RestoreLastAmpPreset(const std::filesystem::path& amplifierPath)
+{
+  const auto scope = _DessPresetAmplifierIDForManifestPath(amplifierPath);
+  if (scope.empty()) return false;
+  _SetDessPresetAmplifierScope(scope);
+  const auto found = mLastPresetByAmp.find(mDessPresetAmplifierId);
+  if (found == mLastPresetByAmp.end()) return false;
+  std::string error;
+  if (_RecallDessPreset(found->second, error, false)) return true;
+  // A deleted or unreadable preset falls back to this amp's normal defaults.
+  mLastPresetByAmp.erase(found);
+  return false;
 }
 
 void NeuralAmpModeler::_LoadDessPreset(const char* path)
@@ -1792,11 +1835,13 @@ void NeuralAmpModeler::_LoadDessPreset(const char* path)
 
 void NeuralAmpModeler::_ApplyDessPreset(const std::string& path)
 {
+  _SyncDessPresetScopeToCurrentAmplifier();
   if (path.empty())
   {
     const auto manifest = std::filesystem::u8path(_GetPlayerManifestPathSnapshot().Get());
     if (!_BundledFactoryDefaults(manifest)) return;
-    _ApplyBundledFactoryDefaults(manifest, true, false);
+    mLastPresetByAmp.erase(mDessPresetAmplifierId);
+    _ApplyBundledFactoryDefaults(manifest, true);
     _SetPlayerManifestPathAndRequest(manifest.u8string().c_str(), true);
     mDessPresetPath.clear();
     mDessPresetLabel = "Model Default";
@@ -1812,13 +1857,7 @@ void NeuralAmpModeler::_ApplyDessPreset(const std::string& path)
     if (auto* ui = GetUI())
       _ShowMessageBox(ui, error.c_str(), "Preset was not loaded", kMB_OK);
     _UpdateDessPresetUI();
-    return;
   }
-
-  mDessPresetPath = selected.lexically_normal();
-  mDessPresetLabel = dessamp::preset::Label(mDessPresetPath);
-  mDessPresetModified = false;
-  _UpdateDessPresetUI();
 }
 
 void NeuralAmpModeler::_NavigateDessPreset(const int delta)
@@ -1952,11 +1991,19 @@ void NeuralAmpModeler::_LoadBundledFactoryDefaults()
     if (document.at("schema_version") != 1 || !document.at("amplifiers").is_array()
         || document.at("amplifiers").size() != mBundledAmplifierPaths.size())
       throw std::runtime_error("Factory defaults do not match the bundled catalogue");
+    const auto choices = GetBundledIRChoices(GetBundleID());
+    std::map<std::filesystem::path, std::string> cabinets;
     // Validate the whole bank before publishing any entry.
     for (std::size_t index = 0; index < mBundledAmplifierPaths.size(); ++index)
     {
       const auto manifest = nam::player::LoadManifest(mBundledAmplifierPaths[index]);
       const auto& entry = document.at("amplifiers").at(index);
+      const auto cabinet = entry.value("cabinet", std::string("Desfire.wav"));
+      const auto choice = std::find_if(choices.begin(), choices.end(), [&](const BundledIRChoice& ir) {
+        return std::filesystem::path(ir.second).filename() == cabinet;
+      });
+      if (choice == choices.end()) throw std::runtime_error("Factory default cabinet is unavailable: " + cabinet);
+      cabinets.emplace(std::filesystem::path(mBundledAmplifierPaths[index]).lexically_normal(), choice->second);
       const auto& values = entry.at("parameters");
       if (entry.at("artifact_id") != manifest.artifact_id || entry.at("model_sha256") != manifest.model_sha256
           || !values.is_array() || (values.size() != kOxideLevel && values.size() != kNumParams))
@@ -1974,8 +2021,7 @@ void NeuralAmpModeler::_LoadBundledFactoryDefaults()
           || mBundledFactoryDefaults[index][kIRToggle] != 1.0)
         throw std::runtime_error("Factory defaults must enable the player and cabinet");
     }
-    if (GetBundledDefaultIRPath(GetBundleID()).empty())
-      throw std::runtime_error("Factory defaults require a bundled cabinet");
+    mFactoryCabinetByAmp = std::move(cabinets);
     mBundledFactoryDefaultsValid.assign(mBundledAmplifierPaths.size(), true);
   }
   catch (const std::exception& error)
@@ -1994,18 +2040,21 @@ const std::array<double, kNumParams>* NeuralAmpModeler::_BundledFactoryDefaults(
   return nullptr;
 }
 
-void NeuralAmpModeler::_ApplyBundledFactoryDefaults(const std::filesystem::path& path, const bool notifyHost, bool preserveCabinet)
+std::string NeuralAmpModeler::_DefaultCabinetForAmp(const std::filesystem::path& path) const
 {
-  const auto factoryIR = GetBundledDefaultIRPath(GetBundleID());
-  const std::string currentIR = _GetIRPathSnapshot().Get();
-  const bool keepCustomIR = preserveCabinet && notifyHost && !currentIR.empty() && currentIR != factoryIR;
+  const auto found = mFactoryCabinetByAmp.find(path.lexically_normal());
+  return found == mFactoryCabinetByAmp.end() ? GetBundledDefaultIRPath(GetBundleID()) : found->second;
+}
+
+void NeuralAmpModeler::_ApplyBundledFactoryDefaults(const std::filesystem::path& path, const bool notifyHost)
+{
   const auto* defaults = _BundledFactoryDefaults(path);
   if (!defaults)
     return;
   for (int param = 0; param < kNumParams; ++param)
   {
     // The legacy selector is not the conditioned catalogue index.
-    if (param == kAmpModel || (keepCustomIR && param == kIRToggle))
+    if (param == kAmpModel || _IsRigParam(param))
       continue;
     if (notifyHost)
       _SetParameterValueFromMainThread(param, GetParam(param)->ToNormalized(defaults->at(param)));
@@ -2020,8 +2069,7 @@ void NeuralAmpModeler::_ApplyBundledFactoryDefaults(const std::filesystem::path&
       mPlayerConditionTargets[index].store(defaults->at(kFirstPlayerConditionParam + index) / 100.0,
                                            std::memory_order_relaxed);
   }
-  if (!keepCustomIR)
-    _SetIRPathAndRequest(factoryIR.c_str());
+  _SetIRPathAndRequest(_DefaultCabinetForAmp(path).c_str());
 }
 
 int NeuralAmpModeler::_AmplifierStripIndex() const
@@ -2077,7 +2125,7 @@ void NeuralAmpModeler::_ApplyCustomAmplifier(const std::filesystem::path& path)
       _SetPlayerManifestPathAndRequest(libraryPath.u8string().c_str(), true);
     }
     mLastCustomAmpPath = libraryPath;
-    _SyncDessPresetScopeToCurrentAmplifier();
+    if (_RestoreLastAmpPreset(libraryPath)) return;
     mDessPresetPath.clear();
     mDessPresetLabel = "Model Default";
     mDessPresetModified = false;
@@ -2110,14 +2158,13 @@ void NeuralAmpModeler::_ApplyBundledAmplifier(const int next)
     if (path.extension() == ".dess")
       mLastCustomAmpPath = path;
   }
+  const std::size_t target = mBundledAmplifierProductRootIndices[static_cast<std::size_t>(next)];
+  if (_RestoreLastAmpPreset(mBundledAmplifierPaths[target])) return;
   if (!GetParam(kPlayerMode)->Bool())
     _SetParameterValueFromMainThread(kPlayerMode, 1.0);
   if (!GetParam(kNAMActive)->Bool())
     _SetParameterValueFromMainThread(kNAMActive, 1.0);
-  const std::size_t target = mBundledAmplifierProductRootIndices[static_cast<std::size_t>(next)];
   _ApplyBundledFactoryDefaults(mBundledAmplifierPaths[target], true);
-  _SetDessPresetAmplifierScope(
-    _DessPresetAmplifierIDForManifestPath(mBundledAmplifierPaths[target]));
   _SetPlayerManifestPathAndRequest(mBundledAmplifierPaths[target].c_str(), true);
   mDessPresetPath.clear();
   mDessPresetLabel = "Model Default";
@@ -2156,6 +2203,7 @@ void NeuralAmpModeler::_ShowTuner(bool open)
 
 void NeuralAmpModeler::OnUIClose()
 {
+  _SaveStandaloneRig(true);
   _FinishRigChange(false);
   _ShowTuner(false);
   mTuner.Enable(false);
@@ -2189,9 +2237,6 @@ void NeuralAmpModeler::OnUIOpen()
 
   if (mModel.load(std::memory_order_acquire) != nullptr)
   {
-    // Host notification is deliberately deferred to OnIdle() to avoid a
-    // synchronous host edit while the editor is being attached.
-    mOutputModeValidationPending.store(true, std::memory_order_release);
     _UpdateControlsFromModel();
     _UpdatePlayerControls();
   }
@@ -2276,8 +2321,6 @@ void NeuralAmpModeler::OnParamChange(int paramIdx)
         mAmpLoadRequest.fetch_add(1, std::memory_order_release);
       _SetInputGain();
       _SetOutputGain();
-      if (active && GetParam(kOutputMode)->Int() != 0)
-        mOutputModeValidationPending.store(true, std::memory_order_release);
       break;
     }
     case kIRToggle:
@@ -2295,8 +2338,6 @@ void NeuralAmpModeler::OnParamChange(int paramIdx)
     case kOutputLevel: _SetOutputGain(); break;
     case kOutputMode:
       _SetOutputGain();
-      if (GetParam(kOutputMode)->Int() != 0)
-        mOutputModeValidationPending.store(true, std::memory_order_release);
       break;
     // Tone stack:
     case kToneBass: mToneBassTarget.store(GetParam(paramIdx)->Value(), std::memory_order_release); break;
@@ -2308,7 +2349,7 @@ void NeuralAmpModeler::OnParamChange(int paramIdx)
 
 void NeuralAmpModeler::OnParamChangeUI(int paramIdx, EParamSource source)
 {
-  if (source == EParamSource::kUI || source == EParamSource::kHost)
+  if (!_IsRigParam(paramIdx) && (source == EParamSource::kUI || source == EParamSource::kHost))
   {
     mDessPresetModified = true;
     _UpdateDessPresetUI();
@@ -2615,9 +2656,8 @@ void NeuralAmpModeler::_FallbackDSP(iplug::sample** inputs, iplug::sample** outp
       outputs[c][s] = inputs[c][s];
 }
 
-void NeuralAmpModeler::_SetInputGain()
+std::optional<double> NeuralAmpModeler::_ModelInputReferenceDBU() const
 {
-  iplug::sample inputGainDB = GetParam(kInputLevel)->Value();
   // Acquire the metadata publication before reading its relaxed fields. The
   // metadata describes the currently adopted object, which remains the DSP
   // source while a replacement selection is loading or parked in bypass.
@@ -2627,27 +2667,29 @@ void NeuralAmpModeler::_SetInputGain()
     && metadataRequest == mAmpLoadRequest.load(std::memory_order_acquire)
     && mModelMetadataSelection.load(std::memory_order_relaxed) == mAmpModelIdx.load(std::memory_order_acquire)
     && mModelMetadataEpoch.load(std::memory_order_relaxed) == mAudioConfigEpoch.load(std::memory_order_acquire);
-  if (haveCurrentModel && GetParam(kCalibrateInput)->Bool())
-  {
-    // Calibrated packages declare the analog level represented by 0 dBFS.
-    // Workflow-validation packages without that evidence intentionally use a
-    // visible 0 dBu fallback so the user can still apply one consistent
-    // interface setting across every amplifier. The Settings panel labels
-    // that fallback as unverified rather than silently skipping calibration.
-    const double modelInputReferenceDBU = mModelMetadataHasInputLevel.load(std::memory_order_relaxed)
-                                            ? mModelMetadataInputLevel.load(std::memory_order_relaxed)
-                                            : 0.0;
-    inputGainDB += GetParam(kInputCalibrationLevel)->Value() - modelInputReferenceDBU;
-  }
+  if (!haveCurrentModel) return std::nullopt;
+  // Use the documented 0 dBu fallback for models without a measured reference.
+  return mModelMetadataHasInputLevel.load(std::memory_order_relaxed)
+    ? mModelMetadataInputLevel.load(std::memory_order_relaxed) : 0.0;
+}
+
+void NeuralAmpModeler::_SetInputGain()
+{
+  double inputGainDB = GetParam(kInputLevel)->Value();
+  if (GetParam(kCalibrateInput)->Bool())
+    if (const auto reference = _ModelInputReferenceDBU())
+      inputGainDB += GetParam(kInputCalibrationLevel)->Value() - *reference;
   mInputGain.store(DBToAmp(inputGainDB), std::memory_order_release);
 }
 
 void NeuralAmpModeler::_SetOutputGain()
 {
   double gainDB = GetParam(kOutputLevel)->Value();
-  mModelMetadataRequest.load(std::memory_order_acquire);
+  const auto metadataRequest = mModelMetadataRequest.load(std::memory_order_acquire);
   const bool haveCurrentMetadata =
     mAmpActiveTarget.load(std::memory_order_acquire) && mModel.load(std::memory_order_acquire) != nullptr
+    && metadataRequest == mAmpLoadRequest.load(std::memory_order_acquire)
+    && mModelMetadataSelection.load(std::memory_order_relaxed) == mAmpModelIdx.load(std::memory_order_acquire)
     && mModelMetadataEpoch.load(std::memory_order_relaxed) == mAudioConfigEpoch.load(std::memory_order_acquire);
   if (haveCurrentMetadata)
   {
@@ -3048,23 +3090,77 @@ void NeuralAmpModeler::_ProcessOutput(iplug::sample** inputs, iplug::sample** ou
     }
 }
 
-void NeuralAmpModeler::_ValidateOutputModeForCurrentModel()
+bool NeuralAmpModeler::_IsRigParam(int param)
 {
-  const int outputMode = GetParam(kOutputMode)->Int();
-  if (outputMode == 0)
-    return;
+  return std::find(kRigParams.begin(), kRigParams.end(), param) != kRigParams.end();
+}
 
-  const bool metadataMatchesCurrentModel =
-    mModelMetadataRequest.load(std::memory_order_acquire) == mAmpLoadRequest.load(std::memory_order_acquire)
-    && mModelMetadataSelection.load(std::memory_order_relaxed) == mAmpModelIdx.load(std::memory_order_acquire)
-    && mModelMetadataEpoch.load(std::memory_order_relaxed) == mAudioConfigEpoch.load(std::memory_order_acquire);
-  if (!metadataMatchesCurrentModel)
-    return;
+std::array<double, NeuralAmpModeler::kRigParams.size()> NeuralAmpModeler::_RigValues() const
+{
+  std::array<double, kRigParams.size()> values{};
+  for (size_t i = 0; i < values.size(); ++i) values[i] = GetParam(kRigParams[i])->Value();
+  return values;
+}
 
-  const bool supported = outputMode == 1 ? mModelMetadataHasLoudness.load(std::memory_order_relaxed)
-                                         : mModelMetadataHasOutputLevel.load(std::memory_order_relaxed);
-  if (!supported && GetParam(kOutputMode)->Int() == outputMode)
-    _SetParameterValueFromMainThread(kOutputMode, 0.0);
+void NeuralAmpModeler::_LoadStandaloneRig()
+{
+#if defined(OS_IOS)
+  // The iOS app hosts its own AUv3 code in process. Other AU hosts keep
+  // separate instance state in their projects and must never write app prefs.
+  const auto bundle = CFBundleGetMainBundle();
+  const auto id = bundle ? CFBundleGetIdentifier(bundle) : nullptr;
+  if (!id || !CFEqual(id, CFSTR("com.dessdynamics.dessamp"))) return;
+#elif !defined(APP_API)
+  return;
+#endif
+  mRigSettingsFile = mDessPresetRootDirectory.parent_path() / "rig-settings.json";
+  mLastRigValues = _RigValues();
+  std::error_code ec;
+  if (!std::filesystem::is_regular_file(mRigSettingsFile, ec)
+      || std::filesystem::file_size(mRigSettingsFile, ec) > 4096 || ec) return;
+  try
+  {
+    std::ifstream input(mRigSettingsFile);
+    const auto doc = nlohmann::json::parse(input);
+    if (doc.at("version") != 1) return;
+    auto values = mLastRigValues;
+    for (size_t i = 0; i < values.size(); ++i)
+    {
+      const auto* param = GetParam(kRigParams[i]);
+      const auto value = doc.at("rig").at(param->GetName()).get<double>();
+      if (!std::isfinite(value) || value < param->GetMin() || value > param->GetMax()) return;
+      values[i] = value;
+    }
+    for (size_t i = 0; i < values.size(); ++i) GetParam(kRigParams[i])->Set(values[i]);
+    mLastRigValues = _RigValues();
+    _SetInputGain();
+    _SetOutputGain();
+  }
+  catch (const std::exception& e) { std::cerr << "Ignoring invalid DessAmp rig settings: " << e.what() << '\n'; }
+}
+
+// Called by the UI timer and editor close, never by the render callback.
+void NeuralAmpModeler::_SaveStandaloneRig(bool flush)
+{
+  if (mRigSettingsFile.empty()) return;
+  const auto now = std::chrono::steady_clock::now();
+  if (!flush && now < mNextRigSave) return;
+  mNextRigSave = now + std::chrono::milliseconds(150);
+  const auto values = _RigValues();
+  if (values == mLastRigValues) return;
+  nlohmann::json doc{{"version", 1}};
+  for (size_t i = 0; i < values.size(); ++i) doc["rig"][GetParam(kRigParams[i])->GetName()] = values[i];
+  std::error_code ec;
+  std::filesystem::create_directories(mRigSettingsFile.parent_path(), ec);
+  if (ec) return;
+  auto temp = mRigSettingsFile;
+  temp += ".tmp-" + std::to_string(now.time_since_epoch().count());
+  std::ofstream output(temp, std::ios::trunc);
+  output << doc.dump() << '\n';
+  output.close();
+  if (output) std::filesystem::rename(temp, mRigSettingsFile, ec);
+  if (!output || ec) std::filesystem::remove(temp, ec);
+  else mLastRigValues = values;
 }
 
 void NeuralAmpModeler::_SetParameterValueFromMainThread(const int paramIdx, const double normalizedValue)
@@ -3080,20 +3176,10 @@ void NeuralAmpModeler::_SetParameterValueFromMainThread(const int paramIdx, cons
 
 void NeuralAmpModeler::_UpdateControlsFromModel()
 {
-  const unsigned int metadataRequest = mModelMetadataRequest.load(std::memory_order_acquire);
-  if (metadataRequest != mAmpLoadRequest.load(std::memory_order_acquire)
-      || mModelMetadataSelection.load(std::memory_order_relaxed) != mAmpModelIdx.load(std::memory_order_acquire)
-      || mModelMetadataEpoch.load(std::memory_order_relaxed) != mAudioConfigEpoch.load(std::memory_order_acquire))
-    return;
-  const bool hasInputLevel = mModelMetadataHasInputLevel.load(std::memory_order_relaxed);
-  // The independent settings overlay exposes the append-only calibration
-  // parameters without reintroducing the legacy NAM settings page.
   if (auto* graphics = GetUI())
-  {
     if (auto* settings = graphics->GetControlWithTag(kCtrlTagSettingsBox))
       settings->As<DessAmpSettingsPanelControl>()->SetModelInputReference(
-        hasInputLevel, mModelMetadataInputLevel.load(std::memory_order_relaxed));
-  }
+        _ModelInputReferenceDBU(), mModelMetadataHasInputLevel.load(std::memory_order_relaxed));
 }
 
 void NeuralAmpModeler::_UpdatePlayerControls()
@@ -3512,14 +3598,13 @@ void NeuralAmpModeler::_ToggleAutoInputMatch()
 {
   using State = dessamp::AutoInputMatch::State;
   const auto state = mAutoInputMatch.GetState();
-  if (state == State::Requested || state == State::Measuring)
+  if (state == State::Requested || state == State::Measuring || state == State::Complete)
   {
     mAutoInputMatch.Cancel();
-    mAutoInputStatus = "Cancelled; Input unchanged.";
+    mAutoInputStatus = "Match cancelled.";
     return;
   }
-  if (!mAudioConfigInitialized.load() || !mAmpActiveTarget.load() || mModel.load() == nullptr
-      || mModelMetadataRequest.load() != mAmpLoadRequest.load())
+  if (!mAudioConfigInitialized.load() || !_ModelInputReferenceDBU())
   {
     mAutoInputStatus = "Enable an amp and audio processing first.";
     return;
@@ -3529,47 +3614,80 @@ void NeuralAmpModeler::_ToggleAutoInputMatch()
   mAutoCalibrationBefore = GetParam(kInputCalibrationLevel)->Value();
   mAutoCalibrationEnabled = GetParam(kCalibrateInput)->Bool();
   mAutoInputStarted = std::chrono::steady_clock::now();
-  mAutoInputStatus = "Strum strongly; keep the interface out of red.";
+  mAutoInputStatus = "Listening for five seconds.";
   mAutoInputMatch.Start();
+}
+
+void NeuralAmpModeler::_SetMatchedInput(bool enableCalibration, double trim)
+{
+  const double previousTrim = GetParam(kInputLevel)->Value();
+  if (trim == previousTrim && enableCalibration == GetParam(kCalibrateInput)->Bool()) return;
+  // Apply a cut before a boost so an audio block between the two host gestures
+  // cannot see more gain than either the old or the new total.
+  if (trim < previousTrim)
+    _SetParameterValueFromMainThread(kInputLevel, GetParam(kInputLevel)->ToNormalized(trim));
+  if (GetParam(kCalibrateInput)->Bool() != enableCalibration)
+    _SetParameterValueFromMainThread(kCalibrateInput, enableCalibration ? 1.0 : 0.0);
+  if (trim > previousTrim)
+    _SetParameterValueFromMainThread(kInputLevel, GetParam(kInputLevel)->ToNormalized(trim));
+}
+
+void NeuralAmpModeler::_ResetInput()
+{
+  mAutoInputMatch.Cancel();
+  mMatchedInput.reset();
+  _SetMatchedInput(false, 0.0);
+  mAutoInputStatus = "Reset. Interface level kept.";
 }
 
 void NeuralAmpModeler::_UpdateAutoInputMatch()
 {
   using State = dessamp::AutoInputMatch::State;
-  auto state = mAutoInputMatch.GetState();
+  const auto state = mAutoInputMatch.GetState();
+  const auto reference = _ModelInputReferenceDBU();
+  if (mMatchedInput && (mMatchedInput->ampRequest != mAmpLoadRequest.load() || !GetParam(kCalibrateInput)->Bool()
+      || mMatchedInput->trimDB != GetParam(kInputLevel)->Value()
+      || mMatchedInput->headroomDBU != GetParam(kInputCalibrationLevel)->Value()))
+  {
+    mMatchedInput.reset();
+    mAutoInputStatus.clear();
+  }
+  if (state == State::Interrupted)
+  {
+    mAutoInputMatch.Cancel();
+    mAutoInputStatus = "Audio rate changed. Match again.";
+  }
   bool active = state == State::Requested || state == State::Measuring;
   if (active || state == State::Complete)
   {
-    if (mAutoInputAmpRequest != mAmpLoadRequest.load() || !mAmpActiveTarget.load()
+    if (mAutoInputAmpRequest != mAmpLoadRequest.load() || !reference
         || mAutoInputBefore != GetParam(kInputLevel)->Value()
         || mAutoCalibrationBefore != GetParam(kInputCalibrationLevel)->Value()
         || mAutoCalibrationEnabled != GetParam(kCalibrateInput)->Bool())
     {
       mAutoInputMatch.Cancel();
-      mAutoInputStatus = "Settings changed; retry Auto Input.";
+      mAutoInputStatus = "Settings changed. Match again.";
       active = false;
     }
     else if (state == State::Complete)
     {
       const double peak = mAutoInputMatch.Peak();
       if (mAutoInputMatch.Clipped())
-        mAutoInputStatus = "Clipping: lower interface gain and retry.";
+        mAutoInputStatus = "Clipping. Lower interface gain and retry.";
       else if (peak < 0.0031622776601683794) // -50 dBFS, reject silence/very low input
-        mAutoInputStatus = "Input too quiet; check routing and retry.";
+        mAutoInputStatus = "Input too quiet. Check routing.";
       else
       {
-        _SetInputGain();
-        const double calibrationDB = 20.0 * std::log10(mInputGain.load()) - mAutoInputBefore;
-        const double requested = dessamp::AutoInputMatch::TrimDB(peak, calibrationDB);
-        const double trim = std::round(std::clamp(requested, GetParam(kInputLevel)->GetMin(),
-                                                GetParam(kInputLevel)->GetMax()) * 10.0) / 10.0;
-        _SetParameterValueFromMainThread(kInputLevel, GetParam(kInputLevel)->ToNormalized(trim));
-        mDessPresetModified = true;
-        _UpdateDessPresetUI();
-        std::ostringstream status;
-        status << "Input " << std::showpos << std::fixed << std::setprecision(1) << trim
-               << " dB" << (std::abs(trim - requested) > 0.051 ? " (trim limit); check level." : " set. Match finished.");
-        mAutoInputStatus = status.str();
+        const double requested = dessamp::AutoInputMatch::TrimDB(peak, mAutoCalibrationBefore - *reference);
+        const double trim = std::round(requested * 10.0) / 10.0;
+        if (trim < GetParam(kInputLevel)->GetMin() || trim > GetParam(kInputLevel)->GetMax())
+          mAutoInputStatus = "Outside trim range. Check interface gain.";
+        else
+        {
+          _SetMatchedInput(true, trim);
+          mMatchedInput = MatchedInput{mAutoInputAmpRequest, GetParam(kInputLevel)->Value(), mAutoCalibrationBefore};
+          mAutoInputStatus = "Matched to -12 dBFS peak.";
+        }
       }
       mAutoInputMatch.Cancel(); // consume once; no continuous gain following
       active = false;
@@ -3577,15 +3695,19 @@ void NeuralAmpModeler::_UpdateAutoInputMatch()
     else if (std::chrono::steady_clock::now() - mAutoInputStarted > std::chrono::seconds(12))
     {
       mAutoInputMatch.Cancel();
-      mAutoInputStatus = "No continuous audio; enable monitoring and retry.";
+      mAutoInputStatus = "No audio. Enable input monitoring.";
       active = false;
     }
     else
-      mAutoInputStatus = "Strum strongly: " + std::to_string(mAutoInputMatch.Progress()) + "% measured.";
+      mAutoInputStatus = "Listening... " + std::to_string(mAutoInputMatch.Progress()) + "%";
   }
   if (auto* graphics = GetUI())
     if (auto* settings = graphics->GetControlWithTag(kCtrlTagSettingsBox))
-      settings->As<DessAmpSettingsPanelControl>()->SetAutoInputStatus(mAutoInputStatus, active);
+    {
+      auto* panel = settings->As<DessAmpSettingsPanelControl>();
+      panel->SetModelInputReference(reference, mModelMetadataHasInputLevel.load(std::memory_order_relaxed));
+      panel->SetAutoInputStatus(mAutoInputStatus, active, mMatchedInput.has_value());
+    }
 }
 
 void NeuralAmpModeler::_UpdateLatency()

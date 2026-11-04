@@ -5,7 +5,7 @@
 #import <Cocoa/Cocoa.h>
 #import <AudioUnit/AUCocoaUIView.h>
 #include <fstream>
-#include <json.hpp>
+#include "factory_test_profile.h"
 
 int main(int argc, char** argv)
 {
@@ -19,10 +19,11 @@ int main(int argc, char** argv)
       std::ifstream input(argv[2]);
       const auto profile = nlohmann::json::parse(input);
       const int slot = std::stoi(argv[3]);
-      const auto params = profile.at("amplifiers").at(slot - 1).at("parameters").get<std::array<double, kParameterCount>>();
+      const auto& entry = profile.at("amplifiers").at(slot - 1);
+      const auto params = FactoryTestParameters<kParameterCount>(entry);
       const auto resources = std::filesystem::path(argv[1]).parent_path().parent_path() / "Resources";
       const auto model = (resources / "PrivateValidation/Amplifiers" / ("amp-0" + std::to_string(slot) + ".dess")).string();
-      const auto cabinet = (resources / "IRs/Desfire.wav").string();
+      const auto cabinet = (resources / "IRs" / entry.value("cabinet", std::string("Desfire.wav"))).string();
       if (slot != 1) {
         auto state = MakeStateDictionary(model, cabinet, params); ApplyState(unit, state); CFRelease(state);
       }

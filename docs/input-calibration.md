@@ -5,33 +5,16 @@ interface jack receiving the guitar. It is separate from the main **Input**
 knob: calibration establishes the capture reference, while **Input** remains a
 creative trim.
 
-## Quick setup: Auto Input
+## Match your playing level
 
-Open **Settings > AUTO INPUT**, enable live monitoring in the host, and play
-strong chords for five seconds. Keep the interface's clip indicator out of the
-red. DessAmp measures the incoming signal before its Input/calibration gain,
-then sets the existing Input knob once so the measured strongest peak reaches
-approximately **-12 dBFS before Gate / Drive / Amp**. It leaves room for stronger
-future transients; it does not normalize continuously or compress your playing.
-Future peaks and the nonlinear amp's output can still clip, so check both the
-interface and output meters and turn down Output if necessary.
+1. Open **Settings** and set **Interface maximum input level** to the specification for your jack and gain setting. The number in **dBu** describes the analog signal your interface can accept.
+2. Enable input monitoring, tap **Match Input**, and play strong chords for five seconds. On success, Settings shows **Calibration on** and **Input matched**. DessAmp enables the interface correction and sets the Input trim once, aiming for a peak of **−12 dBFS** before Gate, Drive and Amp.
+3. Read **Input trim** and **Total gain** in **dB**. For example, a +10 dBu interface and the Fireball’s −0.54 dBu reference give a +10.54 dB correction. If the measured guitar peak is already around −12 dBFS, the match can set the trim to −10.5 dB. The two adjustments add up to about 0 dB, so the guitar stays near its original level.
+4. Tap **Reset Input** to turn calibration off and return the Input knob to 0 dB. DessAmp keeps the interface setting for your next match.
 
-Auto Input rejects near-full-scale/non-finite samples and very quiet input,
-supports cancellation, and times out if live audio is not running. Changing
-the amp, Input, or calibration during measurement cancels the result. It never
-changes the interface's analog gain. A clipped recording cannot be repaired by
-turning down a plugin; lower the interface gain or use an appropriate pad first.
-The result is limited to the existing -20 to +20 dB Input range and reports when
-that limit prevents the target. The resulting trim is saved with the preset;
-the transient measurement itself is not saved and adds no host parameters.
+The amp, your playing and the interface gain all affect the measured peak. The match cannot measure an interface’s analog headroom. For the response at the physical capture reference, use manual interface calibration and leave Input at 0 dB.
 
-**Auto Input is a convenient playing-level target, not physical calibration.**
-Pickup voltage and playing strength are unknown, so a strum cannot reveal an
-interface's dBu reference. With calibration enabled, Auto Input accounts for
-that correction when setting Input; it may deliberately offset it to hit the
-playing-level target. For the measured hardware response, use manual interface
-calibration and leave Input at 0 dB instead. FORGE/REDLINE remain unverified in
-absolute analog level even after Auto Input.
+**Cancel Match** keeps the previous settings. Clipping, silence, interrupted audio, or a result outside the Input knob’s ±20 dB range also leave them as they were. If the interface clips, reduce its analog gain before trying again. Calibration, headroom and trim belong to RIG: switching amps or recalling a sound leaves them alone. The displayed total gain can still change because each amp has its own capture reference. The five-second measurement ends once the trim is set.
 
 ## Interface reference setup
 
@@ -56,5 +39,5 @@ clearly labels and uses a `0 dBu` fallback. This intentionally makes those
 models hotter when calibration is enabled; it does not claim they are
 physically calibrated.
 
-Calibration is off by default so old sessions retain their sound. It is saved
-inside the normal plugin/preset state and applies before Gate, Drive, and Amp.
+Calibration is off on first use. The standalone remembers RIG between launches;
+a plug-in instance restores it with its DAW session. Calibration applies before the drive, gate detector and amp.

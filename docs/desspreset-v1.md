@@ -2,11 +2,18 @@
 
 `.desspreset` is a small binary state file for DESS AMP. It is deliberately
 separate from a `.dess` amplifier package: the amp package contains the learned
-model and its control schema, while the preset remembers the exact plug-in
-state that selects that model and sets all 33 host parameters. Parameters
+model and its control schema, while the preset remembers your amp, pedal and
+cabinet. The payload retains the 33 host parameter slots for compatibility. Parameters
 0 through 28 retain their previous IDs. The PRE Level knobs use four appended
 slots (29 Oxide, 30 Amber, 31 Verdant, 32 Nocturne). All four are stored,
 including levels for pedals that are bypassed.
+
+RIG belongs to the player instance. A named preset writes factory placeholders
+in slots 0 (input), 2 (threshold), 6 (output), 9 (gate), 15 and 16 (input
+calibration and reference) and 17 (output mode). Loading any sound preset,
+including an older file, ignores these slots. DAW session serialization still
+saves and restores their actual values. The standalone keeps them in its
+Application Support folder, separately from the amp preset banks.
 
 Existing 29-value presets and factory profiles reopen with each individual
 trim at 0 dB. Their original Boost Level (ID 7) still supplies the common
@@ -26,7 +33,7 @@ The v1 file layout is:
 | 0 | 8 | ASCII `DESSPRST` |
 | 8 | 4 | little-endian version (`1`) |
 | 12 | 4 | little-endian state size |
-| 16 | state size | byte-exact output of the existing `SerializeState` method |
+| 16 | state size | player state chunk with the amp and IR paths and the parameter slots described above |
 
 Readers require the declared size to consume the complete file, reject unknown
 versions, truncation, trailing bytes, and state payloads larger than 4 MiB.

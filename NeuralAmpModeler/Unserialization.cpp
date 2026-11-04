@@ -25,44 +25,23 @@
 
 // Boilerplate
 
-void NeuralAmpModeler::_UnserializeApplyConfig(nlohmann::json& config)
+void NeuralAmpModeler::_UnserializeApplyConfig(nlohmann::json& config, bool ampPreset)
 {
   // Legacy session/preset states only had a single Boost Level. Keep its
   // value and automation, and clear per-pedal trims from any previous state.
   for (const auto name : dessmetal::state::kPedalLevelNames)
     if (!config.contains(std::string(name)))
       config[std::string(name)] = 0.0;
-  // Output-mode compatibility is validated after the selected model publishes
-  // its metadata. This lets SickDess restore calibrated operation while models
-  // without the required metadata are still corrected to Raw.
-
-  auto getParamByName = [&](std::string& name) {
-    // Could use a map but eh
-    for (int i = 0; i < kNumParams; i++)
-    {
-      iplug::IParam* param = GetParam(i);
-      if (strcmp(param->GetName(), name.c_str()) == 0)
-      {
-        return param;
-      }
-    }
-    // else
-    return (iplug::IParam*)nullptr;
-  };
   TRACE
   ENTER_PARAMS_MUTEX
-  for (auto it = config.begin(); it != config.end(); ++it)
+  for (int index = 0; index < kNumParams; ++index)
   {
-    std::string name = it.key();
-    iplug::IParam* pParam = getParamByName(name);
-    if (pParam != nullptr)
+    auto* param = GetParam(index);
+    if (ampPreset && _IsRigParam(index)) continue;
+    const auto value = config.find(param->GetName());
+    if (value != config.end())
     {
-      pParam->Set(*it);
-      iplug::Trace(TRACELOC, "%s %f", pParam->GetName(), pParam->Value());
-    }
-    else
-    {
-      iplug::Trace(TRACELOC, "%s NOT-FOUND", name.c_str());
+      param->Set(*value);
     }
   }
   OnParamReset(iplug::EParamSource::kPresetRecall);
@@ -391,7 +370,7 @@ private:
   int mPatch;
 };
 
-int NeuralAmpModeler::_UnserializeStateWithKnownVersion(const iplug::IByteChunk& chunk, int startPos)
+int NeuralAmpModeler::_UnserializeStateWithKnownVersion(const iplug::IByteChunk& chunk, int startPos, bool ampPreset)
 {
   // We already got through the header before calling this.
   int pos = startPos;
@@ -434,15 +413,15 @@ int NeuralAmpModeler::_UnserializeStateWithKnownVersion(const iplug::IByteChunk&
   }
   if (!(version.GetMajor() == 0 && version.GetMinor() == 2))
     _Add02PlayerDefaults(config);
-  _UnserializeApplyConfig(config);
+  _UnserializeApplyConfig(config, ampPreset);
   return pos;
 }
 
-int NeuralAmpModeler::_UnserializeStateWithUnknownVersion(const iplug::IByteChunk& chunk, int startPos)
+int NeuralAmpModeler::_UnserializeStateWithUnknownVersion(const iplug::IByteChunk& chunk, int startPos, bool ampPreset)
 {
   nlohmann::json config;
   int pos = _GetConfigFrom_Earlier(chunk, startPos, config);
   _Add02PlayerDefaults(config);
-  _UnserializeApplyConfig(config);
+  _UnserializeApplyConfig(config, ampPreset);
   return pos;
 }

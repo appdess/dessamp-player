@@ -5,8 +5,10 @@
 #include <chrono>
 #include <cstdint>
 #include <filesystem>
+#include <map>
 #include <memory>
 #include <mutex>
+#include <optional>
 #include <string>
 #include <vector>
 #include "../AudioDSPTools/dsp/ImpulseResponse.h"
@@ -429,6 +431,7 @@ private:
   // :param nChansOut: Out to external
   void _ProcessOutput(iplug::sample** inputs, iplug::sample** outputs, const size_t nFrames, const size_t nChansIn,
                       const size_t nChansOut);
+  std::optional<double> _ModelInputReferenceDBU() const;
   void _SetInputGain();
   void _SetOutputGain();
   WDL_String _GetNAMPathSnapshot() const;
@@ -444,15 +447,25 @@ private:
   void _SetBoostNAMPath(const char* path);
 
   // See: Unserialization.cpp
-  void _UnserializeApplyConfig(nlohmann::json& config);
+  void _UnserializeApplyConfig(nlohmann::json& config, bool ampPreset);
+  bool _SerializePlayerState(iplug::IByteChunk& chunk, bool ampPreset) const;
+  int _ReadPlayerState(const iplug::IByteChunk& chunk, int startPos, bool ampPreset);
   // 0.7.9 and later
-  int _UnserializeStateWithKnownVersion(const iplug::IByteChunk& chunk, int startPos);
+  int _UnserializeStateWithKnownVersion(const iplug::IByteChunk& chunk, int startPos, bool ampPreset);
   // Hopefully 0.7.3-0.7.8, but no gurantees
-  int _UnserializeStateWithUnknownVersion(const iplug::IByteChunk& chunk, int startPos);
+  int _UnserializeStateWithUnknownVersion(const iplug::IByteChunk& chunk, int startPos, bool ampPreset);
 
   // Validate model-dependent parameters from a non-render thread and keep the
   // host-visible value aligned with the effective DSP behavior.
-  void _ValidateOutputModeForCurrentModel();
+  static constexpr std::array<int, 7> kRigParams{
+    kInputLevel, kNoiseGateActive, kNoiseGateThreshold, kOutputLevel, kCalibrateInput, kInputCalibrationLevel, kOutputMode};
+  static bool _IsRigParam(int param);
+  std::array<double, kRigParams.size()> _RigValues() const;
+  void _LoadStandaloneRig();
+  void _SaveStandaloneRig(bool flush = false);
+  std::filesystem::path mRigSettingsFile;
+  std::array<double, kRigParams.size()> mLastRigValues{};
+  std::chrono::steady_clock::time_point mNextRigSave{};
   // Apply a normalized value from OnIdle as a complete host-visible gesture.
   void _SetParameterValueFromMainThread(int paramIdx, double normalizedValue);
 
@@ -477,7 +490,8 @@ private:
   void _ApplyCustomAmplifier(const std::filesystem::path& path);
   void _LoadBundledFactoryDefaults();
   const std::array<double, kNumParams>* _BundledFactoryDefaults(const std::filesystem::path& path) const;
-  void _ApplyBundledFactoryDefaults(const std::filesystem::path& path, bool notifyHost, bool preserveCabinet = true);
+  std::string _DefaultCabinetForAmp(const std::filesystem::path& path) const;
+  void _ApplyBundledFactoryDefaults(const std::filesystem::path& path, bool notifyHost);
   int _CurrentBundledAmplifierIndex() const;
   int _CurrentBundledAmplifierProductIndex() const;
   std::string _BundledAmplifierVariantPath(const std::string& productFamily,
@@ -489,16 +503,22 @@ private:
   void _SetDessPresetAmplifierScope(const std::string& amplifierId);
   void _SyncDessPresetScopeToCurrentAmplifier();
   void _UpdateDessPresetUI();
-  bool _RecallDessPreset(const std::filesystem::path& path, std::string& error);
+  bool _RestoreLastAmpPreset(const std::filesystem::path& amplifierPath);
+  void _SelectNamedPreset(const std::filesystem::path& path);
+  bool _RecallDessPreset(const std::filesystem::path& path, std::string& error, bool allowRelink = true);
 
   // Make sure that the latency is reported correctly.
   void _UpdateLatency();
   void _ToggleAutoInputMatch();
   void _UpdateAutoInputMatch();
+  void _SetMatchedInput(bool enableCalibration, double trim);
+  void _ResetInput();
   dessamp::AutoInputMatch mAutoInputMatch;
   dessamp::GuitarTuner mTuner;
   void _ShowTuner(bool open);
-  std::string mAutoInputStatus = "Fixed trim, not physical calibration.";
+  std::string mAutoInputStatus;
+  struct MatchedInput { unsigned int ampRequest; double trimDB, headroomDBU; };
+  std::optional<MatchedInput> mMatchedInput;
   unsigned int mAutoInputAmpRequest = 0;
   double mAutoInputBefore = 0.0, mAutoCalibrationBefore = 0.0;
   bool mAutoCalibrationEnabled = false;
@@ -542,7 +562,6 @@ private:
   // Host automation and generic editors can select a model-dependent output
   // mode while OnParamChange is running on the render thread. Defer capability
   // validation and any host notification to OnIdle().
-  std::atomic<bool> mOutputModeValidationPending{false};
   // State migration can canonicalize host-visible values while the host is
   // still inside its restore callback. Republish them from the next OnIdle.
   std::atomic<bool> mHostStateRepublishPending{false};
@@ -654,6 +673,7 @@ private:
   DessAmpPage mPlayerPage = kAmpPage;
   // Disk-preset selection is editor state, not another host parameter. Host
   // state compatibility therefore remains exactly the existing 29 values.
+  std::map<std::string, std::filesystem::path> mLastPresetByAmp;
   std::filesystem::path mDessPresetPath;
   std::filesystem::path mDessPresetRootDirectory;
   std::filesystem::path mDessPresetDirectory;
@@ -668,6 +688,7 @@ private:
   std::vector<std::string> mBundledAmplifierPaths;
   std::vector<std::array<double, kNumParams>> mBundledFactoryDefaults;
   std::vector<bool> mBundledFactoryDefaultsValid;
+  std::map<std::filesystem::path, std::string> mFactoryCabinetByAmp;
   std::vector<std::string> mBundledAmplifierProductFamilies;
   std::vector<std::string> mBundledAmplifierProductVariants;
   std::vector<std::size_t> mBundledAmplifierProductRootIndices;

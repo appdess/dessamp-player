@@ -16,6 +16,16 @@ CABINET_HASHES = {
 }
 
 
+def profile_matches_bank(profile):
+    if not isinstance(profile, dict) or profile.get("schema_version") != 1:
+        return False
+    amps = profile.get("amplifiers")
+    return (profile.get("ir_sha256") == CABINET_HASHES["Desfire.wav"]
+            and isinstance(amps, list) and 1 <= len(amps) <= 32
+            and all(isinstance(amp, dict) and isinstance(amp.get("cabinet", "Desfire.wav"), str)
+                    and amp.get("cabinet", "Desfire.wav") in CABINET_HASHES for amp in amps))
+
+
 def stage_factory_bank(resource_root, environment=None):
     """The caller resets the generated IR directory before staging.
     Public source-only exports omit the entire private bank.
@@ -40,7 +50,6 @@ def stage_factory_bank(resource_root, environment=None):
         if metadata.st_size > 65536:
             raise RuntimeError("factory defaults exceed size limit")
         profile = json.load(source)
-        if (profile.get("schema_version") != 1 or not 1 <= len(profile.get("amplifiers", [])) <= 32
-                or profile.get("ir_sha256") != CABINET_HASHES["Desfire.wav"]):
+        if not profile_matches_bank(profile):
             raise RuntimeError("factory profile does not match the Version C bank")
         copy_open_regular_source(source, metadata, profile_target)

@@ -1010,6 +1010,7 @@
 /* Begin PBXShellScriptBuildPhase section */
 		4F33163621C53DD500612805 /* Run Script - prepare_resources-ios.py */ = {
 			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
 			buildActionMask = 2147483647;
 			files = (
 			);
@@ -1017,6 +1018,7 @@
 			);
 			name = "Run Script - prepare_resources-ios.py";
 			outputPaths = (
+				"$(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/amp-knob-face@2x.png",
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;

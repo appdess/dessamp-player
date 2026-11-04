@@ -1,5 +1,6 @@
 #pragma once
 
+#include <optional>
 #include <algorithm>
 #include <chrono>
 #include <cstdio>
@@ -101,7 +102,7 @@ public:
     if (mPage == kRigPage)
     {
       g.FillRoundRect(Surface, layout.utility, 9.f);
-      g.DrawText(Text(12.f, TextSecondary, EAlign::Near), "SIGNAL LEVELS", layout.levels.GetFromTop(18.f));
+      g.DrawText(Text(12.f, TextSecondary, EAlign::Near), "RIG LEVELS  /  SHARED BY ALL AMPS", layout.levels.GetFromTop(18.f));
       g.DrawLine(Hairline, layout.levels.L, layout.levels.B, layout.levels.R, layout.levels.B);
     }
     if (layout.portraitPhone && mPage == kAmpPage)
@@ -1704,17 +1705,18 @@ private:
 class DessAmpSettingsPanelControl : public IControl
 {
 public:
-  explicit DessAmpSettingsPanelControl(const IRECT& bounds, std::function<void()> autoInputAction, std::function<void()> feedbackAction)
-  : IControl(bounds, {kCalibrateInput, kInputCalibrationLevel}), mAutoInputAction(std::move(autoInputAction)),
-    mFeedbackAction(std::move(feedbackAction))
+  DessAmpSettingsPanelControl(const IRECT& bounds, std::function<void()> match, std::function<void()> reset,
+                              std::function<void()> feedback)
+  : IControl(bounds, {kCalibrateInput, kInputCalibrationLevel, kInputLevel}),
+    mAutoInputAction(std::move(match)), mResetInputAction(std::move(reset)), mFeedbackAction(std::move(feedback))
   {
   }
 
-  void SetModelInputReference(bool measured, double inputLevelDBU)
+  void SetModelInputReference(std::optional<double> reference, bool measured)
   {
-    mModelInputReferenceReady = true;
+    if (reference == mModelInputReference && measured == mModelInputReferenceMeasured) return;
+    mModelInputReference = reference;
     mModelInputReferenceMeasured = measured;
-    mModelInputReferenceDBU = measured ? inputLevelDBU : 0.0;
     SetDirty(false);
   }
 
@@ -1728,11 +1730,16 @@ public:
     SetDirty(false);
   }
 
-  void SetAutoInputStatus(const std::string& status, bool active)
+  void SetAutoInputStatus(const std::string& status, bool active, bool matched)
   {
-    if (status == mAutoInputStatus && active == mAutoInputActive) return;
+    // A reset can publish host parameters while this panel still holds the
+    // touch. iPlug defers peer updates during capture. Reconcile on release.
+    for (int i = 0; i < NVals(); ++i)
+      SetValueFromDelegate(GetParam(i)->GetNormalized(), i);
+    if (status == mAutoInputStatus && active == mAutoInputActive && matched == mInputMatched) return;
     mAutoInputStatus = status;
     mAutoInputActive = active;
+    mInputMatched = matched;
     SetDirty(false);
   }
 
@@ -1752,6 +1759,7 @@ public:
       Hide(true);
       return;
     }
+    if (ResetInputBounds().Contains(x, y)) { mResetInputAction(); return; }
     if (AutoInputBounds().Contains(x, y))
     {
       mAutoInputAction();
@@ -1806,144 +1814,66 @@ public:
     using namespace DessAmpUI;
     g.FillRect(COLOR_BLACK.WithOpacity(0.78f), mRECT);
     const auto panel = PanelBounds();
-    const bool compact = panel.H() < 500.f;
+    const bool narrow = Narrow();
+    const bool compact = !narrow && panel.H() < 370.f;
+    const float left = panel.L + (narrow ? 16.f : 28.f);
+    const float right = panel.R - (narrow ? 16.f : 28.f);
+    const auto line = [&](float y) { return IRECT(left, y, right, y + 20.f); };
     g.FillRoundRect(SurfaceRaised, panel, 12.f);
-    g.DrawRoundRect(Hairline, panel, 12.f, nullptr, 1.f);
+    g.DrawRoundRect(Hairline, panel, 12.f);
+    g.DrawText(Text(18.f, TextPrimary, EAlign::Near), "SETTINGS", line(panel.T + 20.f));
     DrawButton(g, FeedbackBounds(), "FEEDBACK", false);
-    if (Narrow())
-    {
-      const auto column = panel.GetHPadded(-16.f);
-      const auto line = [&](float dy) { return column.GetFromTop(24.f).GetTranslated(0.f, dy); };
-      g.DrawText(Text(18.f, TextPrimary, EAlign::Near), "SETTINGS", line(18.f));
-      g.DrawText(Text(12.f, TextSecondary, EAlign::Near), "INPUT CALIBRATION", line(66.f));
-      const auto close = CloseBounds();
-      g.DrawLine(TextSecondary, close.MW()-8.f, close.MH()-8.f, close.MW()+8.f, close.MH()+8.f, nullptr, 2.f);
-      g.DrawLine(TextSecondary, close.MW()+8.f, close.MH()-8.f, close.MW()-8.f, close.MH()+8.f, nullptr, 2.f);
-      DrawButton(g, ToggleBounds(), GetValue(0) > 0.5 ? "CALIBRATION ON" : "CALIBRATION OFF", GetValue(0) > 0.5);
-      g.DrawText(Text(13.f, TextSecondary, EAlign::Near), "Set your interface's maximum input level.", line(146.f));
-      DrawButton(g, MOTUInstrumentBounds(), "M2 INSTRUMENT  +16", false);
-      DrawButton(g, MOTUXLRBounds(), "M2 XLR  +10", false);
-      DrawButton(g, MinusBounds(), "-", false);
-      std::ostringstream level;
-      level << std::showpos << std::fixed << std::setprecision(1) << InterfaceLevelDBU() << " dBu";
-      DrawButton(g, ValueBounds(), level.str().c_str(), false);
-      DrawButton(g, PlusBounds(), "+", false);
-      std::ostringstream reference;
-      if (mModelInputReferenceReady)
-        reference << "Model reference: " << std::showpos << mModelInputReferenceDBU
-                  << (mModelInputReferenceMeasured ? " dBu (measured)" : " dBu (fallback)");
-      else
-        reference << "Model reference: waiting for audio";
-      g.DrawText(Text(12.f, TextSecondary, EAlign::Near), reference.str().c_str(), line(290.f));
-      g.DrawLine(Hairline, column.L, line(329.f).T, column.R, line(329.f).T);
-      g.DrawText(Text(12.f, TextSecondary, EAlign::Near), "AUTO INPUT", line(339.f));
-      g.DrawText(Text(13.f, TextPrimary, EAlign::Near), "Strum strongly for five seconds.", line(366.f));
-      DrawButton(g, AutoInputBounds(), mAutoInputActive ? "CANCEL MATCH" : "MATCH INPUT", mAutoInputActive);
-      g.DrawText(Text(12.f, TextSecondary, EAlign::Near), mAutoInputStatus.c_str(), line(450.f));
-      return;
-    }
-
-    g.DrawText(Text(18.f, TextPrimary, EAlign::Near), "SETTINGS",
-               IRECT(panel.L + 32.f, panel.T + (compact ? 16.f : 24.f), panel.R - 72.f,
-                     panel.T + (compact ? 46.f : 56.f)));
-    if (mHostRate > 0.0)
-    {
-      std::ostringstream audioStatus;
-      audioStatus << std::fixed << std::setprecision(1) << mHostRate / 1000.0 << " kHz / DSP " << mHostBlock
-                  << " frames / Plugin delay " << std::setprecision(2) << 1000.0 * mPluginLatency / mHostRate
-                  << " ms";
-      g.DrawText(Text(compact ? 9.f : 10.f, TextSecondary, EAlign::Far), audioStatus.str().c_str(),
-                 IRECT(panel.L + 160.f, panel.T + (compact ? 20.f : 30.f), panel.R - 76.f,
-                       panel.T + (compact ? 44.f : 52.f)));
-    }
     const auto close = CloseBounds();
-    g.DrawLine(TextSecondary, close.L + 12.f, close.T + 12.f, close.R - 12.f, close.B - 12.f, nullptr, 2.f);
-    g.DrawLine(TextSecondary, close.R - 12.f, close.T + 12.f, close.L + 12.f, close.B - 12.f, nullptr, 2.f);
-    const float headerDividerY = panel.T + (compact ? 60.f : 72.f);
-    g.DrawLine(Hairline, panel.L + 32.f, headerDividerY, panel.R - 32.f, headerDividerY, nullptr, 1.f);
-
-    const float left = panel.L + 32.f;
-    const float right = panel.R - 32.f;
-    const float introY = panel.T + (compact ? 68.f : 88.f);
-    g.DrawText(Text(compact ? 12.f : 14.f, TextSecondary, EAlign::Near),
-               "Match the plugin input to your interface's analog headroom.",
-               IRECT(left, introY, right, introY + 24.f));
-
-    g.DrawText(Text(compact ? 9.5f : 11.f, Disabled, EAlign::Near), "INPUT CALIBRATION",
-               IRECT(left, introY + (compact ? 22.f : 28.f), right, introY + (compact ? 38.f : 48.f)));
-    const bool calibrationEnabled = GetValue(0) > 0.5;
-    DrawButton(g, ToggleBounds(), calibrationEnabled ? "CALIBRATION ON" : "CALIBRATION OFF", calibrationEnabled);
-    DrawButton(g, MOTUInstrumentBounds(), "M2 1/4\"  +16", false);
+    g.DrawLine(TextSecondary, close.MW()-8.f, close.MH()-8.f, close.MW()+8.f, close.MH()+8.f, nullptr, 2.f);
+    g.DrawLine(TextSecondary, close.MW()+8.f, close.MH()-8.f, close.MW()-8.f, close.MH()+8.f, nullptr, 2.f);
+    if (!narrow && mHostRate > 0.0)
+    {
+      std::ostringstream audio;
+      audio << std::fixed << std::setprecision(1) << mHostRate / 1000.0 << " kHz / " << mHostBlock
+            << " frames / Plugin delay " << std::setprecision(2) << 1000.0 * mPluginLatency / mHostRate << " ms";
+      g.DrawText(Text(10.f, TextSecondary, EAlign::Far), audio.str().c_str(),
+                 IRECT(left + 95.f, panel.T+18.f, FeedbackBounds().L-10.f, panel.T+44.f));
+    }
+    const bool enabled = GetValue(0) > 0.5;
+    g.DrawText(Text(12.f, TextSecondary, EAlign::Near), "INPUT CALIBRATION", line(ToggleBounds().T-24.f));
+    DrawButton(g, ToggleBounds(), enabled ? "CALIBRATION ON" : "CALIBRATION OFF", enabled);
+    const float labelY = narrow ? MOTUInstrumentBounds().T-26.f : ToggleBounds().B+2.f;
+    g.DrawText(Text(12.f, TextSecondary, EAlign::Near), "Interface maximum input level (dBu)", line(labelY));
+    DrawButton(g, MOTUInstrumentBounds(), narrow ? "M2 INSTRUMENT  +16" : "M2 1/4\"  +16", false);
     DrawButton(g, MOTUXLRBounds(), "M2 XLR  +10", false);
     DrawButton(g, MinusBounds(), "-", false);
     DrawButton(g, PlusBounds(), "+", false);
+    const auto formatDB = [](double db) {
+      std::ostringstream value;
+      value << std::showpos << std::fixed << std::setprecision(1) << db;
+      return value.str();
+    };
+    DrawButton(g, ValueBounds(), (formatDB(InterfaceLevelDBU()) + " dBu").c_str(), false);
 
-    const double interfaceLevelDBU = InterfaceLevelDBU();
-    std::ostringstream valueText;
-    valueText << std::showpos << std::fixed << std::setprecision(1) << interfaceLevelDBU << " dBu";
-    g.FillRoundRect(Surface, ValueBounds(), 5.f);
-    g.DrawRoundRect(Hairline, ValueBounds(), 5.f, nullptr, 1.f);
-    g.DrawText(Text(13.f, TextPrimary, EAlign::Center), valueText.str().c_str(), ValueBounds());
+    const float referenceY = ValueBounds().B + (narrow ? 4.f : 7.f);
+    const std::string reference = !mModelInputReference ? "Model reference: waiting for active amp"
+      : "Model reference: " + formatDB(*mModelInputReference) +
+        (mModelInputReferenceMeasured ? " dBu (measured)" : " dBu (fallback, unverified)");
+    g.DrawText(Text(11.f, TextSecondary, EAlign::Near), reference.c_str(), line(referenceY));
 
-    const float statusY = ToggleBounds().B + (compact ? 6.f : 14.f);
-    const float statusLineHeight = compact ? 17.f : 20.f;
-    std::ostringstream referenceText;
-    referenceText << "Model reference: " << std::showpos << std::fixed << std::setprecision(1)
-                  << mModelInputReferenceDBU << " dBu  ("
-                  << (mModelInputReferenceMeasured ? "measured" : "0 dBu fallback, unverified") << ")";
-    if (!mModelInputReferenceReady)
-      referenceText.str("Model reference: awaiting active audio / model.");
-    g.DrawText(Text(compact ? 10.5f : 12.f, mModelInputReferenceMeasured ? TextPrimary : IColor(255, 236, 176, 86),
-                    EAlign::Near),
-               referenceText.str().c_str(), IRECT(left, statusY, right, statusY + statusLineHeight));
-
-    const double storedCorrectionDB = interfaceLevelDBU - mModelInputReferenceDBU;
-    std::ostringstream correctionText;
-    correctionText << "Applied before Gate / Drive / Amp: " << std::showpos << std::fixed << std::setprecision(1)
-                   << (calibrationEnabled ? storedCorrectionDB : 0.0) << " dB";
-    if (!calibrationEnabled)
-      correctionText << "  (OFF; stored " << storedCorrectionDB << " dB)";
-    if (!mModelInputReferenceReady)
-      correctionText.str("Calibration is applied after the model is ready.");
-    g.DrawText(Text(compact ? 10.5f : 12.f, TextSecondary, EAlign::Near), correctionText.str().c_str(),
-               IRECT(left, statusY + statusLineHeight, right, statusY + 2.f * statusLineHeight));
-
-    const float dividerY = statusY + (compact ? 38.f : 50.f);
-    g.DrawLine(Hairline, left, dividerY, right, dividerY, nullptr, 1.f);
-    g.DrawText(Text(11.f, Disabled, EAlign::Near), "QUICK HOW-TO",
-               IRECT(left, dividerY + (compact ? 8.f : 12.f), right, dividerY + (compact ? 24.f : 30.f)));
-
-    const float howToSize = compact ? 10.5f : 12.f;
-    const float lineHeight = compact ? 17.f : 22.f;
-    const float howToY = dividerY + (compact ? 26.f : 34.f);
-    DrawHowToLine(g, "1. Look up 'maximum input level' for the exact jack at minimum gain.", howToY, howToSize);
-    DrawHowToLine(g, "2. Enter that dBu value. Subtract any analog gain you added.", howToY + lineHeight, howToSize);
-    DrawHowToLine(g, "3. Enable calibration; keep the main Input knob at 0 dB for the captured response.",
-                  howToY + 2.f * lineHeight, howToSize);
-    DrawHowToLine(g, "4. Use the main Input knob afterward only as a creative trim.", howToY + 3.f * lineHeight,
-                  howToSize);
-
-    const float noteY = howToY + 4.f * lineHeight + (compact ? 2.f : 10.f);
-    g.DrawText(Text(compact ? 9.5f : 11.f, IColor(255, 236, 176, 86), EAlign::Near),
-               "MOTU M2: 1/4\" instrument input at minimum gain = +16 dBu; XLR = +10 dBu.",
-               IRECT(left, noteY, right, noteY + 18.f));
-    g.DrawText(Text(compact ? 9.f : 10.5f, Disabled, EAlign::Near),
-               "FORGE and REDLINE currently use the explicit 0 dBu fallback, so calibration intentionally runs them hotter.",
-               IRECT(left, noteY + 19.f, right, noteY + 38.f));
-
-#ifdef APP_API
-    const char* hostText = "Audio device: DessAmp > Settings...  (Command-,)";
-#else
-    const char* hostText = "Audio device and sample rate are managed by your DAW.";
-#endif
-    DrawButton(g, AutoInputBounds(), mAutoInputActive ? "CANCEL MATCH" : "AUTO INPUT", mAutoInputActive);
-    g.DrawText(Text(compact ? 10.f : 12.f, TextPrimary, EAlign::Near), mAutoInputStatus.c_str(),
-               IRECT(AutoInputBounds().R + 12.f, AutoInputBounds().T, right, AutoInputBounds().B));
-    g.DrawText(Text(compact ? 9.f : 11.f, TextSecondary, EAlign::Near),
-               "Strum hard for 5 seconds. Avoid interface clipping. Matches peaks to -12 dBFS, then stops.",
-               IRECT(left, panel.B - 70.f, right, panel.B - 48.f));
-    g.DrawText(Text(10.f, TextSecondary, EAlign::Near), hostText,
-               IRECT(left, panel.B - 31.f, right, panel.B - 13.f));
+    const double trim = GetParam(2)->FromNormalized(GetValue(2));
+    const double correction = enabled && mModelInputReference ? InterfaceLevelDBU() - *mModelInputReference : 0.0;
+    const std::string gain = "Input trim " + formatDB(trim) + " dB    |    Total gain " + formatDB(trim + correction) + " dB";
+    g.DrawText(Text(13.f, TextPrimary, EAlign::Near), gain.c_str(), line(referenceY + 21.f));
+    const auto match = AutoInputBounds();
+    const float headingY = match.T - (compact ? 27.f : 51.f);
+    g.DrawLine(Hairline, left, headingY-4.f, right, headingY-4.f);
+    g.DrawText(Text(12.f, mInputMatched ? TextPrimary : TextSecondary, EAlign::Near),
+               mInputMatched ? "INPUT MATCHED" : "MATCH INPUT LEVEL", line(headingY));
+    g.DrawText(Text(12.f, TextSecondary, compact ? EAlign::Far : EAlign::Near),
+               "Play strong chords for 5 seconds. Target: -12 dBFS.", line(compact ? headingY : match.T-28.f));
+    DrawButton(g, match, mAutoInputActive ? "CANCEL MATCH" : mInputMatched ? "MATCH AGAIN" : "MATCH INPUT",
+               mAutoInputActive || mInputMatched);
+    DrawButton(g, ResetInputBounds(), "RESET INPUT", false);
+    g.DrawText(Text(12.f, TextPrimary, EAlign::Near), mAutoInputStatus.c_str(), line(match.B+3.f));
+    g.DrawText(Text(11.f, TextSecondary, compact ? EAlign::Far : EAlign::Near),
+               compact ? "Reset: calibration off, trim 0 dB." : "Reset turns calibration off and sets Input to 0 dB.",
+               line(match.B + (compact ? 3.f : 24.f)));
   }
 
 private:
@@ -1951,14 +1881,23 @@ private:
   IRECT NarrowRow(float top) const { return PanelBounds().GetHPadded(-16.f).GetFromTop(44.f).GetTranslated(0.f, top); }
   IRECT AutoInputBounds() const
   {
-    if (Narrow()) return NarrowRow(399.f);
+    if (Narrow()) return NarrowRow(388.f).SubRectHorizontal(2, 0).GetReducedFromRight(3.f);
     const auto panel = PanelBounds();
-    return IRECT(panel.L + 32.f, panel.B - 108.f, panel.L + 174.f, panel.B - 76.f);
+    const float top = panel.B - (panel.H() < 370.f ? 65.f : 82.f);
+    return IRECT(panel.L+28.f, top, panel.L+173.f, top+38.f);
+  }
+  IRECT ResetInputBounds() const
+  {
+    if (Narrow()) return NarrowRow(388.f).SubRectHorizontal(2, 1).GetReducedFromLeft(3.f);
+    const auto match = AutoInputBounds();
+    return match.GetTranslated(match.W()+8.f, 0.f);
   }
   IRECT FeedbackBounds() const { return CloseBounds().GetTranslated(-78.f, 0.f).GetFromLeft(48.f).GetHPadded(10.f); }
   std::function<void()> mAutoInputAction;
+  std::function<void()> mResetInputAction;
   std::function<void()> mFeedbackAction;
   std::string mAutoInputStatus;
+  bool mInputMatched = false;
   bool mAutoInputActive = false;
   void DrawButton(IGraphics& g, const IRECT& bounds, const char* label, bool active)
   {
@@ -1967,14 +1906,6 @@ private:
     g.DrawRoundRect(active ? Accent : Hairline, bounds, 5.f, nullptr, active ? 1.5f : 1.f);
     g.DrawText(Text(bounds.H() < 32.f ? 10.f : 11.f, active ? COLOR_WHITE : TextPrimary, EAlign::Center), label,
                bounds);
-  }
-
-  void DrawHowToLine(IGraphics& g, const char* line, float y, float size)
-  {
-    using namespace DessAmpUI;
-    const auto panel = PanelBounds();
-    g.DrawText(Text(size, TextSecondary, EAlign::Near), line,
-               IRECT(panel.L + 32.f, y, panel.R - 32.f, y + 18.f));
   }
 
   double InterfaceLevelDBU() const
@@ -2000,7 +1931,7 @@ private:
   IRECT PanelBounds() const
   {
     const float width = std::min(760.f, mRECT.W() - 40.f);
-    const float height = std::min(Narrow() ? 494.f : 560.f, mRECT.H() - 32.f);
+    const float height = std::min(Narrow() ? 494.f : 398.f, mRECT.H() - 32.f);
     return IRECT(
       mRECT.MW() - width * 0.5f, mRECT.MH() - height * 0.5f, mRECT.MW() + width * 0.5f, mRECT.MH() + height * 0.5f);
   }
@@ -2014,16 +1945,16 @@ private:
   {
     if (Narrow()) return NarrowRow(93.f);
     const auto panel = PanelBounds();
-    const float y = panel.T + (panel.H() < 500.f ? 110.f : 142.f);
-    const float h = panel.H() < 500.f ? 30.f : 36.f;
-    return IRECT(panel.L + 32.f, y, panel.L + 174.f, y + h);
+    const float top = panel.T + (panel.H() < 370.f ? 63.f : 88.f);
+    return IRECT(panel.L + 28.f, top, panel.L + 173.f, top+36.f);
   }
 
   IRECT MOTUInstrumentBounds() const
   {
     if (Narrow()) return NarrowRow(180.f).SubRectHorizontal(2, 0).GetReducedFromRight(3.f);
-    const auto toggle = ToggleBounds();
-    return IRECT(toggle.R + 10.f, toggle.T, toggle.R + 137.f, toggle.B);
+    const auto panel = PanelBounds();
+    const float top = panel.T + (panel.H() < 370.f ? 120.f : 146.f);
+    return IRECT(panel.L+28.f, top, panel.L+155.f, top+34.f);
   }
 
   IRECT MOTUXLRBounds() const
@@ -2056,8 +1987,7 @@ private:
   }
 
   bool mModelInputReferenceMeasured = false;
-  bool mModelInputReferenceReady = false;
-  double mModelInputReferenceDBU = 0.0;
+  std::optional<double> mModelInputReference;
   double mHostRate = 0.0;
   int mHostBlock = 0;
   int mPluginLatency = 0;

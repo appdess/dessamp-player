@@ -33,6 +33,9 @@ starts on a knob still edits that knob. The four factory cabinet tiles stay
 in place: tap one to load it and change the large preview. Rotation changes
 where the controls appear without changing the selected amp or its parameters.
 On a full-size iPad the rig controls remain visible above the three stage pages.
+RIG is shared by every amp. Input trim, calibration, gate, threshold and output
+stay in place across factory and named presets. The standalone remembers them
+between launches; each AUv3 instance restores its own RIG from its host.
 
 Tap **TUNE** in the header and play one open string. The chromatic tuner shows
 the nearest note, octave and cents relative to A4 = 440 Hz. The marker moves
@@ -67,9 +70,16 @@ xcodebuild test -project "$qa/PhoneCheck.xcodeproj" -scheme PhoneCheck \
   -parallel-testing-enabled NO -resultBundlePath "$qa/Player.xcresult"
 ```
 
-It exercises both swipe directions, the ends of the tab strip, all four fixed
-cabinet slots, and a gain edit saved and recalled across rotation, amp changes
-and relaunch. It creates a uniquely named preset in the simulator's FIRE bank.
+It exercises both swipe directions, the four cabinet slots, amp preset recall,
+and a global gate change across amp switches, a preset load and app relaunch.
+The factory rig test saves three uniquely named sounds in the simulator. Verify
+their actual amp, cabinet, pedal and level settings using the **Factory QA run**
+ID printed in the test log:
+
+```sh
+app_data=$(xcrun simctl get_app_container "$DESSAMP_SIMULATOR_UDID" com.dessdynamics.dessamp data)
+python3 ios/UITests/check_factory_sounds.py "$app_data" "$FACTORY_QA_RUN"
+```
 
 ### Recheck custom amp import and AUv3 playback
 

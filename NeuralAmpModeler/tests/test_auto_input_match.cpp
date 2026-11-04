@@ -33,7 +33,7 @@ int main()
   assert(match.Clipped());
   match.Start(); fill(0.1, 0); match.Process(input, 32, 2, 100, true);
   match.Process(input, 32, 2, 200, true);
-  assert(match.GetState() == Matcher::State::Cancelled);
+  assert(match.GetState() == Matcher::State::Interrupted);
   match.Start(); match.Cancel(); match.Process(input, 32, 2, 100, true);
   assert(match.GetState() == Matcher::State::Cancelled);
   match.Start(); fill(0.2, 0.2);
