@@ -1,0 +1,19 @@
+# Pinned upstream A2 implementation and GCS checkpoint transport.
+neural-amp-modeler==0.13.0
+google-cloud-storage==3.4.1
+
+# Explicit security-fixed floors for packages already present in the CUDA base
+# or selected by the runtime graph. Keeping them in the hash lock makes the
+# final scanned versions reproducible rather than relying on mutable base-image
+# packaging tools.
+Brotli==1.2.0
+filelock==3.32.4
+idna==3.19
+jaraco.context==6.1.2
+Jinja2==3.1.6
+Pillow==12.3.0
+Pygments==2.21.0
+setuptools==84.0.0
+soupsieve==2.9.2
+urllib3==2.7.0
+wheel==0.48.0

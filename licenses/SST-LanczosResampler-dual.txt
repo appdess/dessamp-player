@@ -1,0 +1,18 @@
+The adapted `LanczosResampler.h` in AudioDSPTools retains code from iPlug2 and
+SST Basic Blocks. The iPlug2 portion is covered by the iPlug2 notice bundled
+separately. The originating SST header records the following grant for this
+file:
+
+Copyright 2023, various authors, as described in the upstream GitHub
+transaction log. Parts of this code are derived from similar functions in
+Surge or ShortCircuit.
+
+SST Basic Blocks is released under GPL-3.0-or-later. For this file only, its
+sole author at the time of the recorded notice, Paul Walker, additionally
+allows the file to be used in an MIT/BSD context by copying and modifying it.
+The repository copy preserves that full upstream notice at
+`AudioDSPTools/dsp/ResamplingContainer/Dependencies/LanczosResampler.h`.
+
+Upstream source:
+https://github.com/surge-synthesizer/sst-basic-blocks/blob/main/include/sst/basic-blocks/dsp/LanczosResampler.h
+

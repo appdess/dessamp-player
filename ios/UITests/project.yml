@@ -1,0 +1,20 @@
+name: PhoneCheck
+options:
+  bundleIdPrefix: local.dessamp.qa
+  deploymentTarget: {iOS: "17.0"}
+targets:
+  PhoneCheck:
+    type: bundle.ui-testing
+    platform: iOS
+    sources: [Tests]
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: YES
+        PRODUCT_BUNDLE_IDENTIFIER: local.dessamp.qa.rotation
+schemes:
+  PhoneCheck:
+    build:
+      targets:
+        PhoneCheck: [test]
+    test:
+      targets: [PhoneCheck]

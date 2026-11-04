@@ -1,0 +1,39 @@
+{
+  "control_order": ["lead_gain", "bright", "bottom"],
+  "evaluation_input": "/absolute/path/to/unseen-evaluation-di.wav",
+  "references": [
+    {
+      "g_vector": [0.1, 0.0, 0.0],
+      "path": "/absolute/path/to/audit-gain-10-bright-off-bottom-off.wav"
+    },
+    {
+      "g_vector": [0.9, 0.0, 0.0],
+      "path": "/absolute/path/to/audit-gain-90-bright-off-bottom-off.wav"
+    },
+    {
+      "g_vector": [0.1, 1.0, 0.0],
+      "path": "/absolute/path/to/audit-gain-10-bright-on-bottom-off.wav"
+    },
+    {
+      "g_vector": [0.9, 1.0, 0.0],
+      "path": "/absolute/path/to/audit-gain-90-bright-on-bottom-off.wav"
+    },
+    {
+      "g_vector": [0.1, 0.0, 1.0],
+      "path": "/absolute/path/to/audit-gain-10-bright-off-bottom-on.wav"
+    },
+    {
+      "g_vector": [0.9, 0.0, 1.0],
+      "path": "/absolute/path/to/audit-gain-90-bright-off-bottom-on.wav"
+    },
+    {
+      "g_vector": [0.1, 1.0, 1.0],
+      "path": "/absolute/path/to/audit-gain-10-bright-on-bottom-on.wav"
+    },
+    {
+      "g_vector": [0.9, 1.0, 1.0],
+      "path": "/absolute/path/to/audit-gain-90-bright-on-bottom-on.wav"
+    }
+  ],
+  "notes": "Capture these settings on the unseen DI before training. They are deliberately absent from the 0.0/0.2/.../1.0 acquisition grid and must never enter the training project."
+}

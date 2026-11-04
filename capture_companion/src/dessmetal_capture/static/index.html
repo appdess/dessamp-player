@@ -1,0 +1,216 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>DessMetal Trainer</title>
+    <link rel="stylesheet" href="/static/styles.css">
+  </head>
+  <body>
+    <script>window.CAPTURE_TOKEN = __CAPTURE_TOKEN__;</script>
+    <div class="app-shell">
+      <aside class="sidebar">
+        <div class="brand">
+          <div class="brand-mark">DM</div>
+          <div>
+            <strong>DessMetal Trainer</strong>
+            <span>Capture + conditioned training</span>
+          </div>
+        </div>
+        <button id="new-project" class="primary full">New model project</button>
+        <button id="new-demo" class="secondary full hidden">Create Gain replay demo</button>
+        <div class="sidebar-label">Projects</div>
+        <nav id="project-list" class="project-list"></nav>
+        <div class="sidebar-footer">
+          <span id="service-dot" class="status-dot"></span>
+          Local backend
+        </div>
+      </aside>
+
+      <main class="workspace">
+        <section id="empty-state" class="empty-state">
+          <p class="eyebrow">Standalone trainer</p>
+          <h1>Turn a rig into a persistent model project.</h1>
+          <p>Create its controls, collect the recommended settings through an interface or Logic, and package the trained NAM model for the player.</p>
+          <button id="empty-new-project" class="primary">Create the first project</button>
+        </section>
+
+        <section id="project-view" class="hidden">
+          <header class="project-header">
+            <div>
+              <p class="eyebrow">Model project</p>
+              <h1 id="project-name"></h1>
+              <p id="project-description" class="muted"></p>
+            </div>
+            <div class="project-stats">
+              <div><strong id="capture-count">0</strong><span>captures</span></div>
+              <div><strong id="training-job-count">0</strong><span>train jobs</span></div>
+              <div><strong id="model-count">0</strong><span>models</span></div>
+            </div>
+          </header>
+
+          <div class="grid two-column">
+            <section class="card recommendation-card">
+              <div class="card-heading">
+                <div>
+                  <p class="eyebrow">Active capture</p>
+                  <h2>Next recommended setting</h2>
+                </div>
+                <span id="strategy-badge" class="badge">coverage-v1</span>
+              </div>
+              <div id="recommendation-empty" class="recommendation-empty">
+                <p>Ask the acquisition strategy for the next point in this model's control space.</p>
+                <button id="recommend-next" class="primary">Recommend next capture</button>
+              </div>
+              <div id="recommendation-active" class="hidden">
+                <div id="recommended-settings" class="settings-grid"></div>
+                <p id="recommendation-rationale" class="muted small"></p>
+                <div class="button-row">
+                  <button id="dismiss-recommendation" class="ghost">Dismiss</button>
+                </div>
+              </div>
+              <div class="learner-bridge">
+                <div>
+                  <strong>PANAMA learner bridge</strong>
+                  <span id="panama-queue-count">No learner points queued</span>
+                </div>
+                <label class="file-button ghost compact">
+                  Import new_points.json
+                  <input id="panama-points-file" type="file" accept="application/json,.json">
+                </label>
+              </div>
+            </section>
+
+            <section class="card input-card">
+              <div class="card-heading">
+                <div>
+                  <p class="eyebrow">Reference signal</p>
+                  <h2>Standardized input</h2>
+                </div>
+              </div>
+              <div id="input-signal-info" class="muted">No input signal uploaded.</div>
+              <label class="file-button secondary">
+                Choose input WAV
+                <input id="input-signal-file" type="file" accept="audio/wav,.wav">
+              </label>
+            </section>
+          </div>
+
+          <section class="card capture-card">
+            <div class="card-heading">
+              <div>
+                <p class="eyebrow">Acquisition</p>
+                <h2>Capture the recommendation</h2>
+              </div>
+              <div class="tabs" role="tablist">
+                <button class="tab active" data-capture-tab="logic">Logic / WAV</button>
+                <button class="tab" data-capture-tab="direct">Audio interface</button>
+                <button id="replay-tab-button" class="tab hidden" data-capture-tab="replay">Replay dataset</button>
+              </div>
+            </div>
+
+            <div id="capture-tab-logic" class="capture-tab">
+              <ol class="workflow-steps">
+                <li>Place the standardized input on a Logic track and route it through the rig.</li>
+                <li>Set every control to the recommendation shown above.</li>
+                <li>Bounce the mono return without normalization and import it here.</li>
+              </ol>
+              <label class="file-button primary">
+                Import captured WAV
+                <input id="logic-capture-file" type="file" accept="audio/wav,.wav">
+              </label>
+            </div>
+
+            <div id="capture-tab-direct" class="capture-tab hidden">
+              <p class="warning-banner">Starting direct capture immediately plays the full input signal through the selected output and records the selected input. Confirm the interface and reamp output levels, return routing, and monitoring before you start.</p>
+              <div class="device-grid">
+                <label>Return input<select id="input-device"></select></label>
+                <label>Reamp output<select id="output-device"></select></label>
+              </div>
+              <div class="button-row">
+                <button id="refresh-devices" class="secondary">Refresh devices</button>
+                <button id="start-direct-capture" class="danger">Start playback and recording</button>
+              </div>
+              <div id="capture-job" class="job-status hidden"></div>
+            </div>
+
+            <div id="capture-tab-replay" class="capture-tab hidden">
+              <p>Use the matching existing reamp as if it had just been captured. This validates workflow state only; it makes no sound and trains nothing.</p>
+              <button id="capture-replay" class="primary">Accept replay capture</button>
+            </div>
+          </section>
+
+          <section class="card training-card">
+            <div class="card-heading">
+              <div>
+                <p class="eyebrow">Conditioned WaveNet</p>
+                <h2>Prepare and run training</h2>
+              </div>
+              <span id="trainer-badge" class="badge">Checking trainer</span>
+            </div>
+            <p class="muted small">The job freezes the ordered knob vector, WAV hashes, alignment policy, PANAMA model configuration, and local backend. A completed job exports a NAM artifact directly for the standalone player.</p>
+            <div class="training-controls">
+              <label>Run profile
+                <select id="training-profile">
+                  <option value="workflow">5-second functional E2E</option>
+                  <option value="full">Full dataset</option>
+                </select>
+              </label>
+              <button id="prepare-training" class="primary">Prepare training job</button>
+            </div>
+            <p id="training-profile-note" class="warning-banner">Functional E2E uses one epoch and a five-second excerpt. It proves the artifact path, not model quality.</p>
+            <div id="training-history" class="history-list training-history"></div>
+          </section>
+
+          <div class="grid two-column lower-grid">
+            <section class="card">
+              <div class="card-heading">
+                <div><p class="eyebrow">Evidence</p><h2>Capture history</h2></div>
+              </div>
+              <div id="capture-history" class="history-list"></div>
+            </section>
+
+            <section class="card">
+              <div class="card-heading">
+                <div><p class="eyebrow">Player handoff</p><h2>Model artifacts</h2></div>
+              </div>
+              <p class="muted small">Import a trained NAM model. The Trainer packages it with a versioned manifest and validates it through the configured DessMetal loader.</p>
+              <div class="button-row wrap">
+                <label class="file-button secondary">
+                  Import trained .nam
+                  <input id="model-file" type="file" accept=".nam,application/json">
+                </label>
+                <button id="use-demo-model" class="secondary hidden">Use prebuilt replay model</button>
+              </div>
+              <div id="model-history" class="history-list model-list"></div>
+            </section>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <dialog id="project-dialog">
+      <form id="project-form" method="dialog">
+        <div class="dialog-heading">
+          <div><p class="eyebrow">New workspace</p><h2>Create model project</h2></div>
+          <button id="close-dialog" type="button" class="icon-button" aria-label="Close">×</button>
+        </div>
+        <div class="form-grid">
+          <label>Project name<input id="form-project-name" required maxlength="120" placeholder="5153 full control capture"></label>
+          <label>Amp or rig<input id="form-amp-name" required maxlength="120" placeholder="EVH 5153 Red"></label>
+        </div>
+        <label>Description<textarea id="form-description" rows="2" placeholder="What is included in this capture target?"></textarea></label>
+        <div class="controls-heading"><strong>Controls</strong><button id="add-control" type="button" class="ghost">Add control</button></div>
+        <div id="control-rows"></div>
+        <p class="muted small">The first slice builds a finite candidate grid from these ranges. Large multi-knob projects will later use PANAMA's continuous acquisition adapter.</p>
+        <div class="dialog-actions">
+          <button id="cancel-project" type="button" class="ghost">Cancel</button>
+          <button type="submit" class="primary">Create project</button>
+        </div>
+      </form>
+    </dialog>
+
+    <div id="toast" class="toast hidden"></div>
+    <script src="/static/app.js" defer></script>
+  </body>
+</html>

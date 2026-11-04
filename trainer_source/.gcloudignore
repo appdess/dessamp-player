@@ -1,0 +1,12 @@
+.gcloudignore
+__pycache__/
+**/__pycache__/**
+*.pyc
+*.pyo
+nam/_version.py
+outputs/
+**/outputs/**
+tests/resources/*.reapeaks
+.idea/
+.vscode/
+*.code-workspace

@@ -1,0 +1,4 @@
+interface:
+  display_name: "DessAmp Conditioned Training"
+  short_description: "Capture, train, validate, and export conditioned amps"
+  default_prompt: "Use $dessamp-conditioned-training to run a persistent active-learning amp capture through held-out validation and self-contained .dess export."

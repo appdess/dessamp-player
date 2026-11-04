@@ -1,0 +1,44 @@
+{
+  "lr_scheduler": {
+    "class": "ExponentialLR",
+    "kwargs": {
+      "gamma": 0.993
+    }
+  },
+  "net": {
+    "config": {
+      "head_scale": 0.02,
+      "layers_configs": [
+        {
+          "activation": "Tanh",
+          "channels": 16,
+          "condition_size": 1,
+          "dilations": [1, 2, 4, 8, 16, 32, 64, 128, 256, 512],
+          "gated": false,
+          "global_condition_size": 7,
+          "head_bias": false,
+          "head_size": 8,
+          "input_size": 1,
+          "kernel_size": 3
+        },
+        {
+          "activation": "Tanh",
+          "channels": 8,
+          "condition_size": 1,
+          "dilations": [1, 2, 4, 8, 16, 32, 64, 128, 256, 512],
+          "gated": false,
+          "global_condition_size": 7,
+          "head_bias": true,
+          "head_size": 1,
+          "input_size": 16,
+          "kernel_size": 3
+        }
+      ]
+    },
+    "global_condition_size": 7,
+    "name": "WaveNet"
+  },
+  "optimizer": {
+    "lr": 0.001
+  }
+}

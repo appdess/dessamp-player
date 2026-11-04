@@ -1,0 +1,12 @@
+steps:
+  - name: gcr.io/cloud-builders/docker@sha256:661e95acd923514f71f47ce7b390e06a8d31b15febecf772e506babf62960528
+    args:
+      - build
+      - --file=cloud/Dockerfile.conditioned-a2
+      - --tag=${_IMAGE}
+      - .
+images:
+  - ${_IMAGE}
+options:
+  logging: CLOUD_LOGGING_ONLY
+timeout: 1200s

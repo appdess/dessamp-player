@@ -1,0 +1,48 @@
+name: Bug report
+description: Report a reproducible source, build, UI, or host defect.
+title: "[Bug]: "
+labels:
+  - bug
+body:
+  - type: markdown
+    attributes:
+      value: Do not attach credentials, private captures, hidden audit audio, commercial model packages, IRs, signing material, cloud ledgers, or personal paths.
+  - type: input
+    id: revision
+    attributes:
+      label: DessAmp version or source revision
+      description: App version if known, or the commit if you built from source.
+    validations:
+      required: false
+  - type: input
+    id: environment
+    attributes:
+      label: Environment
+      description: OS/device, host, plugin format, architecture, and sample rate where relevant.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Minimal reproduction
+      description: Numbered steps using only non-sensitive inputs.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+  - type: textarea
+    id: observed
+    attributes:
+      label: Observed behavior
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Sanitized evidence
+      description: Short logs, screenshots, or hashes with secrets and personal paths removed.
+

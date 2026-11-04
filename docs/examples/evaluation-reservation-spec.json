@@ -1,0 +1,23 @@
+{
+  "control_order": ["lead_gain", "bright"],
+  "evaluation_input": "/absolute/path/to/unseen-evaluation-di.wav",
+  "references": [
+    {
+      "g_vector": [0.1, 0.0],
+      "path": "/absolute/path/to/audit-lead-gain-10-bright-off.wav"
+    },
+    {
+      "g_vector": [0.9, 0.0],
+      "path": "/absolute/path/to/audit-lead-gain-90-bright-off.wav"
+    },
+    {
+      "g_vector": [0.1, 1.0],
+      "path": "/absolute/path/to/audit-lead-gain-10-bright-on.wav"
+    },
+    {
+      "g_vector": [0.9, 1.0],
+      "path": "/absolute/path/to/audit-lead-gain-90-bright-on.wav"
+    }
+  ],
+  "notes": "Capture these settings on the unseen DI before training; never import them into the training project."
+}

@@ -1,0 +1,39 @@
+# File: environment.yml
+# Created Date: Saturday February 13th 2021
+# Author: Steven Atkinson (steven@atkinson.mn)
+
+# Environment for CPU and macOS (Intel and Apple Silicon)
+# Legacy Conda convenience environment. trainer_source/uv.lock is authoritative.
+
+name: nam
+channels:
+  - conda-forge # pytest-mock
+  - pytorch
+  - defaults
+dependencies:
+  - python>=3.9
+  - black
+  - flake8
+  - h5py
+  - jupyter
+  - matplotlib
+  - numpy<2
+  - pip
+  - pre-commit
+  - pydantic
+  - pytest
+  - pytest-mock
+  # Performance note:
+  # https://github.com/sdatkinson/neural-amp-modeler/issues/505
+  - semver
+  - tensorboard
+  - tqdm
+  - wheel
+  - pip:
+      # PyTorch 2.6+ is required for safe weights-only checkpoint loading.
+      - torch>=2.6.0
+      - auraloss==0.3.0
+      - pytorch_lightning
+      - sounddevice
+      - wavio >=0.0.5
+      - -e ..

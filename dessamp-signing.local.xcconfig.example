@@ -1,0 +1,7 @@
+// Copy this file to dessamp-signing.local.xcconfig and keep the copy local.
+// Team identifiers are not secrets, but personal signing configuration does
+// not belong in a reusable public project template.
+DESSAMP_IOS_CERTIFICATE_ID = Apple Development
+DESSAMP_IOS_DEVELOPMENT_TEAM = REPLACE_WITH_APPLE_TEAM_ID
+DESSAMP_MAC_CERTIFICATE_ID = Developer ID Application
+DESSAMP_MAC_DEVELOPMENT_TEAM = REPLACE_WITH_APPLE_TEAM_ID

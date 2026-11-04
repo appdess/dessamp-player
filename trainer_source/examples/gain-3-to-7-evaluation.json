@@ -1,0 +1,10 @@
+{
+  "control_order": ["gain"],
+  "evaluation_input": "/absolute/path/to/unseen-evaluation-di.wav",
+  "references": [
+    {"g_vector": [0.1875], "path": "/absolute/path/to/audit-gain-3.75.wav"},
+    {"g_vector": [0.4375], "path": "/absolute/path/to/audit-gain-4.75.wav"},
+    {"g_vector": [0.5625], "path": "/absolute/path/to/audit-gain-5.25.wav"},
+    {"g_vector": [0.8125], "path": "/absolute/path/to/audit-gain-6.25.wav"}
+  ]
+}

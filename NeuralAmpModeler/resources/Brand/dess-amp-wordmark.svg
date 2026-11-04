@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="480" height="62" viewBox="-2 0 484 62" role="img" aria-label="DESS AMP">
+  <title>DESS AMP</title>
+  <desc>A cut silver wordmark. The E and S have the angled blade ends of the grille badge; the A, M and P carry the same cut.</desc>
+  <defs>
+    <linearGradient id="steel" x1="0%" y1="0%" x2="16%" y2="100%">
+      <stop offset="0" stop-color="#fcfcfa"/><stop offset=".15" stop-color="#cbd0d1"/>
+      <stop offset=".48" stop-color="#a4a8a9"/><stop offset=".51" stop-color="#8c9092"/>
+      <stop offset=".79" stop-color="#d8d9d7"/><stop offset="1" stop-color="#9b9d9c"/>
+    </linearGradient>
+    <linearGradient id="lip" x1="0%" y1="0%" x2="32%" y2="100%">
+      <stop stop-color="#fff"/><stop offset=".46" stop-color="#bec1c2"/>
+      <stop offset=".55" stop-color="#585b5c"/><stop offset="1" stop-color="#383a3b"/>
+    </linearGradient>
+    <path id="d" fill-rule="evenodd" d="M2 4h40c15 0 21 7 21 19v12c0 14-7 20-21 20H2zm15 13v25h23c6 0 8-2 8-8v-9c0-6-2-8-8-8z"/>
+    <path id="e" d="M0 4h58l-8 13H15v7h37l-6 10H15v8h43l-8 13H0z"/>
+    <path id="s" d="M17 4h44l-9 13H21c-4 0-6 1-6 4s2 4 6 4h23c11 0 17 5 17 14 0 11-7 16-18 16H0l9-13h31c4 0 6-1 6-4s-2-4-6-4H19C7 34 0 29 0 20 0 10 7 4 17 4z"/>
+    <path id="a" fill-rule="evenodd" d="M0 55 25 4h19l25 51H52l-4-9H20l-5 9zm25-20h18l-9-19z"/>
+    <path id="m" d="M0 55V4h17l17 25L51 4h17v51H53V25L36 48h-4L15 25v30z"/>
+    <path id="p" fill-rule="evenodd" d="M0 55V4h41c15 0 21 7 21 18 0 12-7 19-21 19H15v14zm15-38v12h24c6 0 8-2 8-6s-2-6-8-6z"/>
+    <g id="word">
+      <use xlink:href="#d"/><use xlink:href="#e" x="68"/>
+      <use xlink:href="#s" x="129"/><use xlink:href="#s" x="194"/>
+      <use xlink:href="#a" x="274"/><use xlink:href="#m" x="345"/><use xlink:href="#p" x="418"/>
+    </g>
+  </defs>
+  <use xlink:href="#word" transform="translate(0 3)" fill="#222426" stroke="#121314" stroke-width="2" stroke-linejoin="round"/>
+  <use xlink:href="#word" fill="url(#steel)" stroke="url(#lip)" stroke-width="1.6" stroke-linejoin="round"/>
+</svg>

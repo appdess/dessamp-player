@@ -1,0 +1,24 @@
+# The conditioned image needs only its Docker definition, pinned and hash-locked
+# dependency inputs, entrypoint/contract, model implementation, and retained
+# license.
+# Keep local environments, tests, caches, checkpoints, and the historical
+# PANAMA package out of the Cloud Build source archive.
+**
+
+!LICENSE
+
+!cloud/
+cloud/*
+!cloud/Dockerfile.conditioned-a2
+!cloud/cloudbuild-conditioned-a2.yaml
+!cloud/conditioned-a2.gcloudignore
+!cloud/requirements-conditioned-a2.txt
+!cloud/requirements-conditioned-a2-image.constraints.txt
+!cloud/requirements-conditioned-a2.lock.txt
+!cloud/cloud_train_entrypoint.py
+!cloud/conditioned_a2_contract.py
+!cloud/conditioned_a2_entrypoint.py
+!cloud/gcs_capabilities.py
+
+!conditioned_a2/
+!conditioned_a2/*.py

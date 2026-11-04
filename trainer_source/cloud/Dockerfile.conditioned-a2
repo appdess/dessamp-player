@@ -1,0 +1,44 @@
+# Isolated conditioned-A2 trainer. It intentionally does not install the
+# historical trainer_source/nam PANAMA fork under the same package name.
+FROM pytorch/pytorch:2.6.0-cuda12.4-cudnn9-runtime@sha256:77f17f843507062875ce8be2a6f76aa6aa3df7f9ef1e31d9d7432f4b0f563dee
+
+WORKDIR /app
+ENV DEBIAN_FRONTEND=noninteractive
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends --only-upgrade \
+       gpgv \
+       libssl3 \
+       openssl \
+    && apt-get install -y --no-install-recommends \
+       ffmpeg \
+       libportaudio2 \
+       libsndfile1 \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY cloud/requirements-conditioned-a2.txt \
+     cloud/requirements-conditioned-a2-image.constraints.txt \
+     cloud/requirements-conditioned-a2.lock.txt \
+     /app/
+RUN python -c 'import numpy, torch; assert numpy.__version__ == "2.2.2", numpy.__version__; assert torch.__version__ == "2.6.0+cu124", torch.__version__; assert torch.version.cuda == "12.4", torch.version.cuda'
+RUN pip install --no-cache-dir --require-hashes \
+    -r /app/requirements-conditioned-a2.lock.txt \
+    && pip check
+
+# The upstream runtime image carries Linux kernel UAPI headers that are not
+# needed for inference/training with the prebuilt wheels above. Remove that
+# non-runtime package (and any header-only dependents selected by apt) so kernel
+# CVEs cannot be misrepresented as executable container-kernel exposure.
+RUN apt-get purge -y linux-libc-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY conditioned_a2 /app/trainer_source/conditioned_a2
+COPY cloud/cloud_train_entrypoint.py /app/trainer_source/cloud/cloud_train_entrypoint.py
+COPY cloud/conditioned_a2_contract.py /app/trainer_source/cloud/conditioned_a2_contract.py
+COPY cloud/conditioned_a2_entrypoint.py /app/trainer_source/cloud/conditioned_a2_entrypoint.py
+COPY cloud/gcs_capabilities.py /app/trainer_source/cloud/gcs_capabilities.py
+COPY LICENSE /app/trainer_source/LICENSE
+ENV PYTHONPATH=/app
+
+RUN python -c 'from importlib.metadata import version; import nam, numpy, torch; from trainer_source.conditioned_a2.model import build_conditioned_a2; assert version("google-cloud-storage") == "3.4.1"; assert version("neural-amp-modeler") == "0.13.0"; assert nam.__version__ == "0.13.0", nam.__version__; assert numpy.__version__ == "2.2.2", numpy.__version__; assert torch.__version__ == "2.6.0+cu124", torch.__version__; assert torch.version.cuda == "12.4", torch.version.cuda; assert "/app/trainer_source/nam" not in nam.__file__, nam.__file__; assert build_conditioned_a2("lite", 7).receptive_field == 6347; assert build_conditioned_a2("full", 7).receptive_field == 6347'
+
+ENTRYPOINT ["python", "-u", "/app/trainer_source/cloud/conditioned_a2_entrypoint.py"]

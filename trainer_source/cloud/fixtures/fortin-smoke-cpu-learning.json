@@ -1,0 +1,17 @@
+{
+  "train_dataloader": {
+    "batch_size": 32,
+    "drop_last": true,
+    "num_workers": 8,
+    "pin_memory": false,
+    "shuffle": true
+  },
+  "trainer": {
+    "accelerator": "cpu",
+    "check_val_every_n_epoch": 1,
+    "devices": 1,
+    "max_epochs": 1
+  },
+  "trainer_fit_kwargs": {},
+  "val_dataloader": {}
+}

@@ -1,0 +1,43 @@
+{
+  "schema_version": 1,
+  "name": "Lead channel, Gain 3 to 7",
+  "amp_name": "Owner amplifier",
+  "description": "One learned control over the range used for playing.",
+  "acquisition_strategy": "coverage-v1",
+  "controls": [
+    {
+      "id": "gain",
+      "label": "Gain",
+      "minimum": 0.0,
+      "maximum": 1.0,
+      "step": 0.0625,
+      "unit": "",
+      "taper": "linear",
+      "display_minimum": 3.0,
+      "display_maximum": 7.0
+    }
+  ],
+  "candidate_points": [
+    {"gain": 0.0}, {"gain": 0.125}, {"gain": 0.25},
+    {"gain": 0.375}, {"gain": 0.5}, {"gain": 0.625},
+    {"gain": 0.75}, {"gain": 0.875}, {"gain": 1.0}
+  ],
+  "metadata": {
+    "physical_amplifier": true,
+    "control_order": ["gain"],
+    "base_settings": {"gain": 0.5},
+    "frozen_controls": {
+      "channel": "lead",
+      "other_knobs_and_switches": "REPLACE with each actual knob position and switch state"
+    },
+    "training_delay_samples": null,
+    "calibration": {
+      "status": "REPLACE BEFORE USE",
+      "input_level_dbu": null,
+      "send_level": "REPLACE",
+      "return_level": "REPLACE",
+      "reactive_load_or_cabinet": "REPLACE",
+      "uniform_safety_trim_db": null
+    }
+  }
+}

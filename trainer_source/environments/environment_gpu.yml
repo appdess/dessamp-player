@@ -1,0 +1,37 @@
+# Environment file from NAM, modified for PANAMA
+# Legacy Conda convenience environment. trainer_source/uv.lock is authoritative.
+
+name: panama
+channels:
+  - conda-forge # pytest-mock
+  - pytorch
+  - nvidia  # GPU
+  - defaults
+dependencies:
+  - python>=3.9
+  - black
+  - flake8
+  - h5py
+  - jupyter
+  - matplotlib
+  - numpy<2
+  - pip
+  - pre-commit
+  - pydantic>=2
+  - pytest
+  - pytest-mock
+  - semver
+  - tensorboard
+  - tqdm
+  - wheel
+  - pip:
+      # PyTorch 2.6+ is required for safe weights-only checkpoint loading.
+      # Official 2.6 binaries moved from Conda to wheels.
+      - --extra-index-url https://download.pytorch.org/whl/cu124
+      - torch==2.6.0
+      - auraloss==0.3.0
+      - pytorch_lightning
+      - sounddevice
+      - wavio >=0.0.5
+      - torchaudio==2.6.0
+      - -e ..

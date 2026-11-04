@@ -1,0 +1,126 @@
+.DS_Store
+xcuserdata
+*.RPP-bak
+build-*
+.idea/
+
+*.ipch
+*.db
+*.suo
+*/.vs
+*.pem
+mkcert*
+
+NeuralAmpModeler/*.wav
+NeuralAmpModeler/peaks/
+
+# Build logs
+build_log*.txt
+*.log
+
+# VS Code
+.vscode/
+
+# Xcode
+*.xcworkspace
+build/
+
+# Other
+Bin/
+
+# Certificates
+*.p12
+*.pfx
+*.key
+*.jks
+*.keystore
+*.mobileprovision
+*.provisionprofile
+*.cer
+
+# Local credentials and secret-bearing environment files
+.env
+.env.*
+!.env.example
+.netrc
+secrets/
+credentials/
+service-account*.json
+*-service-account.json
+application_default_credentials.json
+gcloud-credentials*.json
+
+# Apple build/signing outputs
+DerivedData/
+*.xcarchive
+*.dSYM/
+/dessamp-signing.local.xcconfig
+
+# Application Outputs
+outputs/
+poc_output/
+NeuralAmpModeler/resources/models/parametric-training-files/
+
+# DessAmp is a conditioned-model player. Keep the legacy DessMetal product
+# catalogue, private drive captures, branded artwork, and cabinet IR collection
+# out of this repository. Rights-cleared drive banks use resources/Drives.
+NeuralAmpModeler/resources/DessMetal.icns
+NeuralAmpModeler/resources/DessMetal.ico
+NeuralAmpModeler/resources/img/DessMetal/
+NeuralAmpModeler/resources/models/
+NeuralAmpModeler/resources/private_validation_irs/
+
+# Private local presentation notes
+/demo-notes/
+/.gitlab-signing-*/
+/.planning/
+/docs/experiments/
+/docs/qa/
+
+# Local first-run state and packaged binaries are never source inputs.
+*.desspreset
+*.component/
+*.vst3/
+*.app/
+*.dmg
+*.pkg
+NeuralAmpModeler/resources/PrivateValidation/
+
+# Python
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+*.egg-info/
+
+# Training and capture evidence stays outside Git. Model/package/audio files
+# are denied by default; only the exact documented Core models and retained
+# trainer loudness fixture are source inputs.
+*.dess
+*.nam
+*.wav
+*.aif
+*.aiff
+*.flac
+*.mp3
+*.m4a
+*.ogg
+!NeuralAmpModelerCore/example_models/*.nam
+!trainer_source/nam/models/_resources/loudness_input.wav
+!NeuralAmpModeler/resources/FactoryBank/Desfire.wav
+!NeuralAmpModeler/resources/FactoryBank/SHFLD-Mix.wav
+!NeuralAmpModeler/resources/FactoryBank/Gleichrichter.wav
+!NeuralAmpModeler/resources/FactoryBank/Green.wav
+trainer_source/training_data/
+trainer_source/demo_ckpt.ckpt
+trainer_source/outputs/
+capture_companion/build/
+*.ckpt
+!trainer_source/demo_ckpt.ckpt
+/capture-data/
+/trainer-data/
+
+# Temporary Build Artifacts
+temp_payload_au/
+temp_pkg/
+temp_tsm1n3/

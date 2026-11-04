@@ -1,0 +1,70 @@
+{
+  "schema_version": 1,
+  "name": "Physical lead channel proof",
+  "amp_name": "Owner amplifier lead channel",
+  "description": "Head-only two-control proof before expanding the real capture schema.",
+  "acquisition_strategy": "coverage-v1",
+  "controls": [
+    {
+      "id": "lead_gain",
+      "label": "Lead Gain",
+      "minimum": 0.0,
+      "maximum": 1.0,
+      "step": 0.1,
+      "unit": "%",
+      "taper": "linear",
+      "display_minimum": 0.0,
+      "display_maximum": 100.0
+    },
+    {
+      "id": "bright",
+      "label": "Bright",
+      "minimum": 0.0,
+      "maximum": 1.0,
+      "step": 1.0,
+      "unit": "",
+      "taper": "switch",
+      "display_minimum": null,
+      "display_maximum": null
+    }
+  ],
+  "candidate_points": [
+    {"lead_gain": 0.0, "bright": 0.0},
+    {"lead_gain": 0.2, "bright": 0.0},
+    {"lead_gain": 0.4, "bright": 0.0},
+    {"lead_gain": 0.6, "bright": 0.0},
+    {"lead_gain": 0.8, "bright": 0.0},
+    {"lead_gain": 1.0, "bright": 0.0},
+    {"lead_gain": 0.0, "bright": 1.0},
+    {"lead_gain": 0.2, "bright": 1.0},
+    {"lead_gain": 0.4, "bright": 1.0},
+    {"lead_gain": 0.6, "bright": 1.0},
+    {"lead_gain": 0.8, "bright": 1.0},
+    {"lead_gain": 1.0, "bright": 1.0}
+  ],
+  "metadata": {
+    "physical_amplifier": true,
+    "control_order": ["lead_gain", "bright"],
+    "base_settings": {"lead_gain": 0.5, "bright": 0.0},
+    "frozen_controls": {
+      "channel": "lead",
+      "bottom": "off",
+      "bass": "12:00",
+      "middle": "12:00",
+      "treble": "12:00",
+      "lead_volume": "12:00",
+      "mid_boost": "off",
+      "presence": "12:00",
+      "master": "external and fixed"
+    },
+    "training_delay_samples": null,
+    "calibration": {
+      "status": "REPLACE BEFORE USE",
+      "input_level_dbu": null,
+      "send_level": "REPLACE",
+      "return_level": "REPLACE",
+      "reactive_load_or_cabinet": "REPLACE",
+      "uniform_safety_trim_db": 0.0
+    }
+  }
+}

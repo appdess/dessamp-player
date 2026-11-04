@@ -1,0 +1,67 @@
+[build-system]
+requires = ["setuptools>=61", "wheel", "setuptools-scm"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "neural-amp-modeler"
+description = "Neural Amp Modeler"
+authors = [
+    {name = "Steven Atkinson", email = "steven@atkinson.mn"},
+]
+readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE"]
+requires-python = ">=3.9"
+dependencies = [
+    "auraloss==0.3.0",
+    "matplotlib",
+    "numpy<2",
+    "pydantic>=2.0.0",
+    "pytorch_lightning",
+    "requests>=2,<3",
+    "scipy>=1.10.0,<2",
+    "sounddevice",
+    "soundfile>=0.12.0,<1",
+    "tensorboard",
+    "torch>=2.6.0",
+    "torchaudio>=2.6.0",
+    "tqdm",
+    "wavio>=0.0.5",
+]
+dynamic = ["version"]
+
+[project.optional-dependencies]
+# Optional features
+transformers-compat = [
+    "transformers>=4",  # Issue-294
+    "numpy<2",  # For older PyTorch versions; user must know when to include
+]
+
+test = [
+    "dessmetal-capture",
+    "pytest",
+    "pytest-mock",
+]
+
+[tool.uv.sources]
+dessmetal-capture = { path = "../capture_companion", editable = true }
+
+[project.urls]
+homepage = "https://github.com/sdatkinson/"
+
+[project.scripts]
+nam = "nam.cli:nam_gui"
+nam-full = "nam.cli:nam_full"
+nam-hello-world = "nam.cli:nam_hello_world"
+
+[tool.setuptools_scm]
+version_scheme = "guess-next-dev"
+local_scheme = "no-local-version"
+write_to = "nam/_version.py"
+fallback_version = "0.13.0"
+
+[tool.setuptools]
+packages = ["nam", "nam.train", "nam.train.gui", "nam.train.gui._resources", "nam.models", "nam.models._resources" ]
+
+[tool.setuptools.package-data]
+"nam.models._resources" = ["*.wav"]

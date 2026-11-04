@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>DessMetal Player</title>
+    <link rel="stylesheet" href="/static/styles.css">
+  </head>
+  <body>
+    <script>window.PLAYER_TOKEN = __PLAYER_TOKEN__;</script>
+    <main class="shell">
+      <header class="topbar">
+        <div class="brand-mark">DM</div>
+        <div>
+          <strong>DessMetal Player</strong>
+          <span>Conditioned NAM audition</span>
+        </div>
+        <div class="status"><i id="service-dot"></i><span id="service-state">Core renderer</span></div>
+      </header>
+
+      <section class="hero">
+        <p class="eyebrow">Loaded artifact</p>
+        <h1 id="model-name">Loading model…</h1>
+        <p id="model-detail" class="muted"></p>
+      </section>
+
+      <div class="layout">
+        <section class="panel controls-panel">
+          <div class="panel-heading">
+            <div><p class="eyebrow">Model controls</p><h2>Shape the amplifier</h2></div>
+            <span id="parameter-count" class="badge"></span>
+          </div>
+          <div id="knobs" class="knob-grid"></div>
+          <div id="quality-row" class="quality-row hidden">
+            <label for="quality">Runtime quality</label>
+            <select id="quality"></select>
+          </div>
+          <button id="render" class="primary" disabled>Render current setting</button>
+          <p class="hint">Moving a knob updates its exact model value. Releasing it renders the loaded input through NAM Core.</p>
+        </section>
+
+        <section class="panel audio-panel">
+          <div class="panel-heading">
+            <div><p class="eyebrow">Audition</p><h2>Input and shaped output</h2></div>
+          </div>
+          <div class="audio-block">
+            <div class="audio-label"><strong>Input WAV</strong><span id="input-info">No input loaded</span></div>
+            <label class="file-button">Choose mono WAV<input id="input-file" type="file" accept="audio/wav,.wav"></label>
+          </div>
+          <div id="output-block" class="audio-block output-block hidden">
+            <div class="audio-label"><strong>Rendered output</strong><span id="output-info"></span></div>
+            <audio id="output-audio" controls></audio>
+          </div>
+          <div id="render-status" class="render-status">Load an input to begin.</div>
+        </section>
+      </div>
+
+      <section class="contract">
+        <div><span>Artifact boundary</span><strong>one self-contained .dess amp</strong></div>
+        <div><span>Inference path</span><strong>Native NAM Core</strong></div>
+        <div><span>Current mode</span><strong>Offline audition</strong></div>
+      </section>
+    </main>
+    <div id="toast" class="toast hidden"></div>
+    <script src="/static/app.js" defer></script>
+  </body>
+</html>
