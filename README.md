@@ -24,6 +24,8 @@ approval for any model artifact.
 
 ## Capture your own physical amp
 
+![The original ENGL Fireball 100 amp head with its lead channel controls visible](docs/images/fireball-100.webp)
+
 Start with the [physical amp capture walkthrough](docs/physical-amp-capture.md).
 It takes you from a measured reamp path through recording, training, independent
 evaluation, exporting a self-contained `.dess` file and loading it in the player.
