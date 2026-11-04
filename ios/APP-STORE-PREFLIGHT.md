@@ -17,28 +17,44 @@ Connect build, Apple’s server-side validation and App Review are still pending
   catalogue, an explicit microphone purpose string and the audio background
   mode. The 1024 px store icon source has no alpha channel.
 - The normal archive contains the four byte-verified Version C cabinets, zero
-  bundled `.dess` amplifiers and zero pedal `.nam` models. The development
-  build tested on the iPhone contains private models supplied separately.
-  Both development profiles allow debugging and are tied to registered devices.
+  bundled `.dess` amplifiers and zero pedal `.nam` models. The full-bank
+  Release archive built separately with development signing includes these sounds:
+
+  | Amplifiers | Pedals | Cabinets |
+  | --- | --- | --- |
+  | FIRE, FORGE, REDLINE US, REDLINE BRIT | Oxide 08, Amber 01, Verdant 09, Nocturne | DZL, SHFLD Mix, Gleichrichter, Green |
+
+  The four amp packages, four pedal models, four cabinet WAVs and factory
+  settings all matched the tested iPhone build by SHA-256. The archive contains
+  the standalone app and AUv3, and the bundle passed strict code-signature
+  verification. The development profiles are tied to registered devices.
+  To reproduce this local archive, use the Release configuration of
+  `iOS-APP with AUv3` with destination `generic/platform=iOS`. Pass the
+  same external amp and drive directories used by the tested build via
+  `DESSAMP_PRIVATE_AMP_DIR` and `DESSAMP_PRIVATE_DRIVE_DIR`, with
+  `DESSAMP_PRIVATE_AMP_VALIDATION=YES` and `DESSAMP_PRIVATE_DRIVE_VALIDATION=YES`.
+  The private checkout supplies the pinned cabinet bank and factory settings.
+  Compare the 13 files in the archived app against the tested build before
+  selecting an archive for distribution.
 - The audio framework includes its file-timestamp privacy reasons, declares
   no tracking or collected data, and imports `stat`. The app and extension
   do not directly import that API. The privacy manifest and third-party
   notices are present in the archive. Review the privacy report again when
   final dependencies and features are frozen.
-- The private Version C build launched on the paired iPhone and the AUv3
-  rendered in an independent simulator host. Project acceptance still calls
-  for physical audio-interface checks on both iPhone and iPad, including route
-  changes, interruptions, sustained playing, latency, and listening approval.
+- The owner heard live guitar and YouTube Music together through an iRig HD 2
+  on iPhone 16 Pro. The AUv3 rendered in an independent simulator host.
+  Physical iPad audio, route changes, interruptions and sustained performance
+  still need checking on the build delivered through TestFlight.
 
 ## Before the first TestFlight upload
 
-1. Decide what players can play on first launch. For a ready-to-play release,
-   ship at least one qualified amplifier with documented redistribution rights.
-   For an import-only player, describe that requirement plainly and give the
-   reviewer a permitted working sample and exact import instructions. Verify
-   redistribution rights for each source IR, model, pedal, font, icon and image.
-   Applying EQ and a fade does not establish rights to distribute the original
-   cabinet recording. Retain the code and asset notices. [App Review Guidelines, sections 2.1 and 5.2](https://developer.apple.com/app-store/review/guidelines/)
+1. Use the full bank above as the target for first launch. FIRE opens with
+   SHFLD Mix, Lead Gain 6.1, Presence 3.9 and drive off. Keep a release record
+   for the exact assets going to Apple, including the origin and distribution
+   rights for the cabinet IRs, amp and pedal models, font, icon and artwork.
+   For an IR made using a song, record whether the song served as a tonal
+   reference or supplied audio retained in the IR, and the applicable rights.
+   Retain the code and asset notices. [App Review Guidelines, sections 2.2 and 5.2](https://developer.apple.com/app-store/review/guidelines/)
 2. Confirm active Apple Developer Program membership, the App Store Connect
    app record for the bundle ID, both registered identifiers and signing roles.
    The local keychain had a development identity and no Apple Distribution
